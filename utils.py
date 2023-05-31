@@ -10,7 +10,7 @@ def get_label_list(config):
     # we have beis labels for title, section title/number,
     # subsection title/number, subsubsection title/number and page number + 1
     # for outside
-    label_list = config['data']['label_list']
+    label_list = config["data"]["label_list"]
 
     # create the mapping between labels and label ids and the reverse mapping
     id2label = {idx: label for idx, label in enumerate(label_list)}
@@ -18,23 +18,20 @@ def get_label_list(config):
 
     # convert the label list to the format required for the huggingface metrics
     # library
-    label_list = [x.replace('_', '-').upper() for x in label_list]
+    label_list = [x.replace("_", "-").upper() for x in label_list]
 
     return label_list, id2label, label2id
 
 
-def get_dataset(contract_dir,
-                id2label,
-                label2id):
+def get_dataset(contract_dir, id2label, label2id):
     # get the list of contracts in the provided dir
     contracts_list = glob.glob(os.path.join(contract_dir, "*.csv"))
 
     data = []
     for tagged_path in contracts_list:
-        tagged_output = \
-            input_pipeline.create_raw_dataset(tagged_path,
-                                              id2label=id2label,
-                                              label2id=label2id)
+        tagged_output = input_pipeline.create_raw_dataset(
+            tagged_path, id2label=id2label, label2id=label2id
+        )
 
         data.append(tagged_output)
 
@@ -45,10 +42,12 @@ def get_class_dist(contract_dir, id2label, label2id):
     # get the list of contracts in the provided dir
     contracts_list = glob.glob(os.path.join(contract_dir, "*.csv"))
 
-    list_of_tagged_df_labels = [pd.read_csv(x).loc[:, ['tagged_sequence']] for x in contracts_list]
+    list_of_tagged_df_labels = [
+        pd.read_csv(x).loc[:, ["tagged_sequence"]] for x in contracts_list
+    ]
     consolidated_tagged_df_labels = pd.concat(list_of_tagged_df_labels, axis=0)
 
-    class_value_counts = consolidated_tagged_df_labels['tagged_sequence'].value_counts()
+    class_value_counts = consolidated_tagged_df_labels["tagged_sequence"].value_counts()
     total_examples = sum(class_value_counts.to_dict().values())
 
     class_weights = torch.zeros(len(label2id))
@@ -60,10 +59,7 @@ def get_class_dist(contract_dir, id2label, label2id):
     return class_value_counts, class_weights
 
 
-def convert_preds_to_labels(predictions,
-                            references,
-                            label_list,
-                            device='cpu'):
+def convert_preds_to_labels(predictions, references, label_list, device="cpu"):
     # Transform predictions and references tensos to numpy arrays
     if device.type == "cpu":
         y_pred = predictions.detach().clone().numpy()
