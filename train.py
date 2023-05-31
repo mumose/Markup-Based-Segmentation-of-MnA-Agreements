@@ -194,7 +194,7 @@ def main(config):
             + f"\n\nEval Metrics: {eval_metrics}"
         )
 
-        if early_stop_ct >= config["model"]["early_stop_ct"]:
+        if early_stop_ct >= config["model"]["early_stop_patience"]:
             break
     return model
 

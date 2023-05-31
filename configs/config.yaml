@@ -53,7 +53,7 @@ model:
 
   model_savepath: markuplm_model.pt
 
-  early_stop_ct: 2
+  early_stop_patience: 2
 
 
 ...
