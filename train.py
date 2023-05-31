@@ -30,38 +30,14 @@ from tqdm.auto import tqdm
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def run_train_loop(batch,
-                   model,
-                   optimizer,
-                   loss_fct,
-                   device,
-                   train_metric,
-                   label_list,
-                   config):
+def run_train_loop(
+    batch, model, optimizer, loss_fct, device, train_metric, label_list, config
+):
     # get the inputs;
     inputs = {k: v.to(device) for k, v in batch.items()}
 
-    if config['ablation']['run_ablation']:
-        if config['ablation']['is_shuffle_xpath_exp']:
-            batch_size, shuffling_dim = inputs['input_ids'].size()
-
-            # when shuffling the xpath tokens, we shuffle along axis 1 (n=512)
-            # so that the order of the DOM tree is nullified
-            for ii in range(batch_size):
-                inputs['xpath_tags_seq'][ii, :, :] = \
-                    inputs['xpath_tags_seq'][ii, torch.randperm(shuffling_dim), :]
-
-                inputs['xpath_subs_seq'][ii, :, :] = \
-                    inputs['xpath_subs_seq'][ii, torch.randperm(shuffling_dim), :]
-
-        else:
-            # setting the xpath embedding to correponding pad tokens
-            xpath_tag_pad_token = config['ablation']['xpath_tag_pad_token']
-            xpath_subs_pad_token = config['ablation']['xpath_subs_pad_token']
-
-            # set the xpath embeddings to the pad token
-            inputs['xpath_tags_seq'].fill_(xpath_tag_pad_token)
-            inputs['xpath_subs_seq'].fill_(xpath_subs_pad_token)
+    if config["ablation"]["run_ablation"]:
+        inputs = utils.ablation(config, inputs)
 
     # zero the parameter gradients
     optimizer.zero_grad()
@@ -104,37 +80,14 @@ def run_train_loop(batch,
     return
 
 
-def run_eval_loop(eval_dataloader,
-                  model,
-                  device,
-                  eval_metric,
-                  config):
+def run_eval_loop(eval_dataloader, model, device, eval_metric, config):
     model.eval()
     for batch in tqdm(eval_dataloader):
         # get the inputs;
         inputs = {k: v.to(device) for k, v in batch.items()}
 
-        if config['ablation']['run_ablation']:
-            if config['ablation']['is_shuffle_xpath_exp']:
-                batch_size, shuffling_dim = inputs['input_ids'].size()
-
-                # when shuffling the xpath tokens, we shuffle along axis 1 (n=512)
-                # so that the order of the DOM tree is nullified
-                for ii in range(batch_size):
-                    inputs['xpath_tags_seq'][ii, :, :] = \
-                        inputs['xpath_tags_seq'][ii, torch.randperm(shuffling_dim), :]
-
-                    inputs['xpath_subs_seq'][ii, :, :] = \
-                        inputs['xpath_subs_seq'][ii, torch.randperm(shuffling_dim), :]
-
-            else:
-                # setting the xpath embedding to correponding pad tokens
-                xpath_tag_pad_token = config['ablation']['xpath_tag_pad_token']
-                xpath_subs_pad_token = config['ablation']['xpath_subs_pad_token']
-
-                # set the xpath embeddings to the pad token
-                inputs['xpath_tags_seq'].fill_(xpath_tag_pad_token)
-                inputs['xpath_subs_seq'].fill_(xpath_subs_pad_token)
+        if config["ablation"]["run_ablation"]:
+            inputs = utils.ablation(config, inputs)
 
         # forward + backward + optimize
         outputs = model(**inputs)
@@ -217,21 +170,19 @@ def main(config):
     for epoch in range(config["model"]["num_epochs"]):
         model.train()
         for train_batch in tqdm(train_dataloader):
-            run_train_loop(train_batch,
-                           model,
-                           optimizer,
-                           loss_fct,
-                           device,
-                           train_metric,
-                           label_list,
-                           config)
+            run_train_loop(
+                train_batch,
+                model,
+                optimizer,
+                loss_fct,
+                device,
+                train_metric,
+                label_list,
+                config,
+            )
 
         # run eval loop
-        run_eval_loop(test_dataloader,
-                      model,
-                      device,
-                      eval_metric,
-                      config)
+        run_eval_loop(test_dataloader, model, device, eval_metric, config)
 
         # compute the metrics at the end of each epoch
         train_metrics = utils.compute_metrics(train_metric)
