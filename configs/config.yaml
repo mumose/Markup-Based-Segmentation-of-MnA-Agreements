@@ -1,0 +1,56 @@
+---
+# dataset related params
+data:
+  train_contract_dir: ../labeling/contracts/tagged/train
+  eval_contract_dir: ../labeling/contracts/tagged/eval
+  test_contract_dir: ../labeling/contracts/tagged/test
+
+  label_list:
+    - b_t
+    - e_t
+    - i_t
+    - s_t
+    - b_n
+    - e_n
+    - i_n
+    - s_n
+    - b_st
+    - e_st
+    - i_st
+    - s_st
+    - b_sn
+    - e_sn
+    - i_sn
+    - s_sn
+    - b_sst
+    - e_sst
+    - i_sst
+    - s_sst
+    - b_ssn
+    - e_ssn
+    - i_ssn
+    - s_ssn
+    - b_ssst
+    - e_ssst
+    - i_ssst
+    - s_ssst
+    - b_sssn
+    - e_sssn
+    - i_sssn
+    - s_sssn
+    - o
+
+model:
+  train_batch_size: 16
+  eval_batch_size: 2
+
+  num_epochs: 10
+  learning_rate: 5e-5
+
+  # index to ignore in the loss_fn
+  ignore_index: -100
+
+  model_savepath: markuplm_model.pt
+
+
+...
