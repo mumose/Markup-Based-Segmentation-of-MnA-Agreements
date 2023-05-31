@@ -145,10 +145,14 @@ def main(config):
                                  shuffle=False)
 
     # define the model
-    # TODO: create option to use a different version of the MarkupLM model
-    model = MarkupLMForTokenClassification.from_pretrained("microsoft/markuplm-base",
-                                                           id2label=id2label,
-                                                           label2id=label2id)
+    if config['model']['use_large_model']:
+        model = MarkupLMForTokenClassification.from_pretrained("microsoft/markuplm-large",
+                                                            id2label=id2label,
+                                                            label2id=label2id)
+    else:
+        model = MarkupLMForTokenClassification.from_pretrained("microsoft/markuplm-base",
+                                                            id2label=id2label,
+                                                            label2id=label2id)
 
     # get the class weights used to weigh the different terms in the loss fn
     class_weights = utils.get_class_dist(config['data']['train_contract_dir'],
@@ -169,6 +173,7 @@ def main(config):
     model = model.to(device)  # move to GPU if available
 
     model.train()
+    best_eval_score = -float('int')
     for epoch in range(config['model']['num_epochs']):
         model.train()
         for train_batch in tqdm(train_dataloader):
@@ -189,11 +194,15 @@ def main(config):
         # compute the metrics at the end of each epoch
         train_metrics = utils.compute_metrics(train_metric)
         eval_metrics = utils.compute_metrics(eval_metric)
+
+        # save the state dict for the best run
+        if eval_metrics['overall_f1'] > best_eval_score:
+            model_savepath = config['model']['model_savepath'].split('.')[0]
+            model_savepath = f"{model_savepath}_{epoch}_{eval_metrics['overall_f1']:0.3f}.pt"
+            torch.save(model.state_dict(), model_savepath)
+
         print(f"Epoch {epoch} Train Metrics: {train_metrics}" +
               f"\n\nEval Metrics: {eval_metrics}")
-
-    # save the state dict of the final trained model
-    torch.save(model.state_dict(), config['model']['model_savepath'])
 
     return model
 
