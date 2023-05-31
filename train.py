@@ -24,11 +24,11 @@ from torch.utils.data import DataLoader
 
 from tqdm.auto import tqdm
 
-
-# TODO: add new script for running inference on test set and obtaining metrics
-# TODO: look at label alignment
-# TODO: is there value in labeling other subwords in each word
 # TODO: add tensorboard functionality
+# TODO: add new script for running inference on test set and obtaining metrics
+# TODO: create slurm file for training on HPC
+# TODO: look into label alignment
+# TODO: is there value in labeling other subwords in each word
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
