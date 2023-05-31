@@ -52,16 +52,13 @@ model:
   ignore_index: -100
 
   model_savepath: markuplm_model.pt
+  early_stop_patience: 2
 
-<<<<<<< HEAD
 ablation:
   run_ablation: true
   is_shuffle_xpath_exp: false
   xpath_tag_pad_token: 216
   xpath_subs_pad_token: 1001
-=======
-  early_stop_patience: 2
->>>>>>> 9d6e56b51579d54fe9003bfe2cfee5b2cab0dd67
 
 
 ...
