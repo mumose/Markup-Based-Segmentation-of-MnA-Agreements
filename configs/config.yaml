@@ -53,5 +53,11 @@ model:
 
   model_savepath: markuplm_model.pt
 
+ablation:
+  run_ablation: true
+  is_shuffle_xpath_exp: false
+  xpath_tag_pad_token: 216
+  xpath_subs_pad_token: 1001
+
 
 ...
