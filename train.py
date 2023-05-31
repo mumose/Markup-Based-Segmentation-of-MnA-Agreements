@@ -174,6 +174,7 @@ def main(config):
 
     model.train()
     best_eval_score = -float('int')
+    early_stop_ct = 0
     for epoch in range(config['model']['num_epochs']):
         model.train()
         for train_batch in tqdm(train_dataloader):
@@ -200,10 +201,14 @@ def main(config):
             model_savepath = config['model']['model_savepath'].split('.')[0]
             model_savepath = f"{model_savepath}_{epoch}_{eval_metrics['overall_f1']:0.3f}.pt"
             torch.save(model.state_dict(), model_savepath)
+        else:
+            early_stop_ct += 1
 
         print(f"Epoch {epoch} Train Metrics: {train_metrics}" +
               f"\n\nEval Metrics: {eval_metrics}")
 
+        if early_stop_ct > config['model']['early_stop_ct']:
+            break
     return model
 
 
