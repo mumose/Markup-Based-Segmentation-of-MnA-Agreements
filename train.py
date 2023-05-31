@@ -1,13 +1,11 @@
 import warnings
 
-warnings.simplefilter(action='ignore', category=FutureWarning)
-warnings.simplefilter(action='ignore', category=UserWarning)
+warnings.simplefilter(action="ignore", category=FutureWarning)
+warnings.simplefilter(action="ignore", category=UserWarning)
 
 import yaml
 import argparse
-import pandas as pd
 
-from transformers import MarkupLMFeatureExtractor
 from transformers import MarkupLMProcessor
 from transformers import MarkupLMForTokenClassification
 
@@ -19,7 +17,6 @@ import input_pipeline
 
 from torch import nn
 from torch.optim import AdamW
-from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
 from tqdm.auto import tqdm
@@ -75,15 +72,17 @@ def run_train_loop(batch,
     # get the logits
     logits = outputs.logits
 
-    attention_mask = inputs['attention_mask']
-    labels = inputs['labels']
+    attention_mask = inputs["attention_mask"]
+    labels = inputs["labels"]
 
     # Only keep active parts of the loss
     num_labels = len(label_list)
     active_loss = attention_mask.view(-1) == 1
     active_logits = logits.view(-1, num_labels)
     active_labels = torch.where(
-        active_loss, labels.view(-1), torch.tensor(loss_fct.ignore_index).type_as(labels)
+        active_loss,
+        labels.view(-1),
+        torch.tensor(loss_fct.ignore_index).type_as(labels),
     )
     loss = loss_fct(active_logits, active_labels)
 
@@ -95,10 +94,7 @@ def run_train_loop(batch,
 
     predictions = outputs.logits.argmax(dim=-1)
     labels = batch["labels"]
-    preds, refs = utils.convert_preds_to_labels(predictions,
-                                                labels,
-                                                label_list,
-                                                device)
+    preds, refs = utils.convert_preds_to_labels(predictions, labels, label_list, device)
 
     train_metric.add_batch(
         predictions=preds,
@@ -147,9 +143,7 @@ def run_eval_loop(eval_dataloader,
         labels = batch["labels"]
         preds, refs = utils.get_labels(predictions, labels)
 
-        eval_metric.add_batch(
-            predictions=preds,
-            references=refs)
+        eval_metric.add_batch(predictions=preds, references=refs)
 
     return
 
@@ -160,70 +154,67 @@ def main(config):
     label_list, id2label, label2id = utils.get_label_list(config)
 
     # preprocess the train and test dataset
-    train_data = utils.get_dataset(config['data']['train_contract_dir'],
-                                   id2label,
-                                   label2id)
+    train_data = utils.get_dataset(
+        config["data"]["train_contract_dir"], id2label, label2id
+    )
 
-    test_data = utils.get_dataset(config['data']['eval_contract_dir'],
-                                  id2label,
-                                  label2id)
+    test_data = utils.get_dataset(
+        config["data"]["eval_contract_dir"], id2label, label2id
+    )
 
-    processor = MarkupLMProcessor.from_pretrained("microsoft/markuplm-base",
-                                                  only_label_first_subword=False
-                                                  )
+    processor = MarkupLMProcessor.from_pretrained(
+        "microsoft/markuplm-base", only_label_first_subword=False
+    )
     processor.parse_html = False
 
     # convert the input dataset
     # to torch datasets. Create the dataloaders as well
-    train_dataset = \
-        input_pipeline.MarkupLMDataset(data=train_data,
-                                       processor=processor,
-                                       max_length=config['model']['max_length']
-                                       )
-    train_dataloader = DataLoader(train_dataset,
-                                  batch_size=config['model']['train_batch_size'],
-                                  shuffle=True)
+    train_dataset = input_pipeline.MarkupLMDataset(
+        data=train_data, processor=processor, max_length=config["model"]["max_length"]
+    )
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=config["model"]["train_batch_size"], shuffle=True
+    )
 
-    test_dataset = \
-        input_pipeline.MarkupLMDataset(data=test_data,
-                                       processor=processor,
-                                       max_length=config['model']['max_length']
-                                       )
-    test_dataloader = DataLoader(test_dataset,
-                                 batch_size=config['model']['test_batch_size'],
-                                 shuffle=False)
+    test_dataset = input_pipeline.MarkupLMDataset(
+        data=test_data, processor=processor, max_length=config["model"]["max_length"]
+    )
+    test_dataloader = DataLoader(
+        test_dataset, batch_size=config["model"]["test_batch_size"], shuffle=False
+    )
 
     # define the model
-    if config['model']['use_large_model']:
-        model = MarkupLMForTokenClassification.from_pretrained("microsoft/markuplm-large",
-                                                            id2label=id2label,
-                                                            label2id=label2id)
+    if config["model"]["use_large_model"]:
+        model = MarkupLMForTokenClassification.from_pretrained(
+            "microsoft/markuplm-large", id2label=id2label, label2id=label2id
+        )
     else:
-        model = MarkupLMForTokenClassification.from_pretrained("microsoft/markuplm-base",
-                                                            id2label=id2label,
-                                                            label2id=label2id)
+        model = MarkupLMForTokenClassification.from_pretrained(
+            "microsoft/markuplm-base", id2label=id2label, label2id=label2id
+        )
 
     # get the class weights used to weigh the different terms in the loss fn
-    class_weights = utils.get_class_dist(config['data']['train_contract_dir'],
-                                         id2label,
-                                         label2id)
+    class_weights = utils.get_class_dist(
+        config["data"]["train_contract_dir"], id2label, label2id
+    )
 
     # define the optimizer and loss fct
-    optimizer = AdamW(model.parameters(),
-                      lr=config['model']['learning_rate'])
+    optimizer = AdamW(model.parameters(), lr=config["model"]["learning_rate"])
 
-    loss_fct = nn.CrossEntropyLoss(weight=torch.tensor(class_weights),
-                                   ignore_index=config['model']['ignore_index'])
+    loss_fct = nn.CrossEntropyLoss(
+        weight=torch.tensor(class_weights), ignore_index=config["model"]["ignore_index"]
+    )
 
     # define the train and eval metric containers
-    train_metric = evaluate.load("seqeval", scheme='BILOU', mode='strict')
-    eval_metric = evaluate.load("seqeval", scheme='BILOU', mode='strict')
+    train_metric = evaluate.load("seqeval", scheme="BILOU", mode="strict")
+    eval_metric = evaluate.load("seqeval", scheme="BILOU", mode="strict")
 
     model = model.to(device)  # move to GPU if available
 
     model.train()
-    best_eval_score = -float('int')
-    for epoch in range(config['model']['num_epochs']):
+    best_eval_score = -float("int")
+    num_epochs_lower_eval = 0
+    for epoch in range(config["model"]["num_epochs"]):
         model.train()
         for train_batch in tqdm(train_dataloader):
             run_train_loop(train_batch,
@@ -247,27 +238,38 @@ def main(config):
         eval_metrics = utils.compute_metrics(eval_metric)
 
         # save the state dict for the best run
-        if eval_metrics['overall_f1'] > best_eval_score:
-            model_savepath = config['model']['model_savepath'].split('.')[0]
-            model_savepath = f"{model_savepath}_{epoch}_{eval_metrics['overall_f1']:0.3f}.pt"
+        if eval_metrics["overall_f1"] > best_eval_score:
+            model_savepath = config["model"]["model_savepath"].split(".")[0]
+            model_savepath = (
+                f"{model_savepath}_{epoch}_{eval_metrics['overall_f1']:0.3f}.pt"
+            )
             torch.save(model.state_dict(), model_savepath)
+        else:
+            num_epochs_lower_eval += 1
 
-        print(f"Epoch {epoch} Train Metrics: {train_metrics}" +
-              f"\n\nEval Metrics: {eval_metrics}")
+        print(
+            f"Epoch {epoch} Train Metrics: {train_metrics}"
+            + f"\n\nEval Metrics: {eval_metrics}"
+        )
 
+        if num_epochs_lower_eval >= config["model"]["early_stop_patience"]:
+            break
     return model
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--config', type=str,
-                        default='./configs/config.yaml',
-                        help='Path to config file specifiying user params')
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="./configs/config.yaml",
+        help="Path to config file specifiying user params",
+    )
 
     args = parser.parse_args()
 
-    with open(args.config, 'r') as fh:
+    with open(args.config, "r") as fh:
         config = yaml.safe_load(fh)
 
     model = main(config)
