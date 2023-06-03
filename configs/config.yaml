@@ -6,6 +6,10 @@ data:
   test_contract_dir: ../labeling/contracts/tagged/test
 
   label_list:
+    - b_tn
+    - e_tn
+    - i_tn
+    - s_tn
     - b_t
     - e_t
     - i_t
@@ -51,7 +55,8 @@ model:
   # index to ignore in the loss_fn
   ignore_index: -100
 
-  model_savepath: markuplm_model.pt
+  model_savepath: ckpts/markuplm_model.pt
+  metric_dir: metrics
   early_stop_patience: 2
 
 ablation:

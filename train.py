@@ -3,26 +3,28 @@ import warnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
 warnings.simplefilter(action="ignore", category=UserWarning)
 
+import os
 import yaml
 import argparse
+import pandas as pd
 
-from transformers import MarkupLMProcessor
-from transformers import MarkupLMForTokenClassification
+from tqdm.auto import tqdm
 
 import torch
 import evaluate
-
-import utils
-import input_pipeline
-
 from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
-from tqdm.auto import tqdm
+from transformers import MarkupLMProcessor
+from transformers import MarkupLMForTokenClassification
+
+import utils
+import input_pipeline
+
 
 # TODO: add tensorboard functionality
-# TODO: add new script for running inference on test set and obtaining metrics
+# TODO: add new script for running inference on eval set and obtaining metrics
 # TODO: create slurm file for training on HPC
 # TODO: look into label alignment
 # TODO: is there value in labeling other subwords in each word
@@ -106,12 +108,12 @@ def main(config):
     # reverse mapping
     label_list, id2label, label2id = utils.get_label_list(config)
 
-    # preprocess the train and test dataset
+    # preprocess the train and eval dataset
     train_data = utils.get_dataset(
         config["data"]["train_contract_dir"], id2label, label2id
     )
 
-    test_data = utils.get_dataset(
+    eval_data = utils.get_dataset(
         config["data"]["eval_contract_dir"], id2label, label2id
     )
 
@@ -129,11 +131,11 @@ def main(config):
         train_dataset, batch_size=config["model"]["train_batch_size"], shuffle=True
     )
 
-    test_dataset = input_pipeline.MarkupLMDataset(
-        data=test_data, processor=processor, max_length=config["model"]["max_length"]
+    eval_dataset = input_pipeline.MarkupLMDataset(
+        data=eval_data, processor=processor, max_length=config["model"]["max_length"]
     )
-    test_dataloader = DataLoader(
-        test_dataset, batch_size=config["model"]["test_batch_size"], shuffle=False
+    eval_dataloader = DataLoader(
+        eval_dataset, batch_size=config["model"]["eval_batch_size"], shuffle=False
     )
 
     # define the model
@@ -167,6 +169,7 @@ def main(config):
     model.train()
     best_eval_score = -float("int")
     num_epochs_lower_eval = 0
+    train_metrics_list, eval_metrics_list = [], []
     for epoch in range(config["model"]["num_epochs"]):
         model.train()
         for train_batch in tqdm(train_dataloader):
@@ -182,11 +185,17 @@ def main(config):
             )
 
         # run eval loop
-        run_eval_loop(test_dataloader, model, device, eval_metric, config)
+        run_eval_loop(eval_dataloader, model, device, eval_metric, config)
 
         # compute the metrics at the end of each epoch
         train_metrics = utils.compute_metrics(train_metric)
         eval_metrics = utils.compute_metrics(eval_metric)
+
+        train_metrics['epoch'] = epoch
+        train_metrics_list.append(train_metrics)
+
+        eval_metrics['epoch'] = epoch
+        eval_metrics_list.append(eval_metrics)
 
         # save the state dict for the best run
         if eval_metrics["overall_f1"] > best_eval_score:
@@ -195,8 +204,12 @@ def main(config):
                 f"{model_savepath}_{epoch}_{eval_metrics['overall_f1']:0.3f}.pt"
             )
             torch.save(model.state_dict(), model_savepath)
+
+            # reset the patience counter for early stopping
+            num_epochs_lower_eval = 0
         else:
             num_epochs_lower_eval += 1
+            print(f"Eval f1 score did not improve. Patience={num_epochs_lower_eval}")
 
         print(
             f"Epoch {epoch} Train Metrics: {train_metrics}"
@@ -204,8 +217,12 @@ def main(config):
         )
 
         if num_epochs_lower_eval >= config["model"]["early_stop_patience"]:
+            print("*" * 50)
+            print("reached max patience limit. Stopping Training")
+            print("*" * 50)
             break
-    return model
+
+    return model, train_metrics_list, eval_metrics_list
 
 
 if __name__ == "__main__":
@@ -223,4 +240,21 @@ if __name__ == "__main__":
     with open(args.config, "r") as fh:
         config = yaml.safe_load(fh)
 
-    model = main(config)
+    model_dir = os.path.dirname(config['model']['model_savepath'])
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir, exist_ok=True)
+
+    metric_dir = config['model']['metric_dir']
+    if not os.path.exists(metric_dir):
+        os.makedirs(metric_dir, exist_ok=True)
+
+    model, train_metrics_list, eval_metrics_list = main(config)
+
+    train_metrics_df = pd.DataFrame(train_metrics_list)
+    eval_metrics_df = pd.DataFrame(eval_metrics_list)
+
+    train_metrics_savepath = os.path.join(metric_dir, "train_metrics.csv")
+    train_metrics_df.to_csv(train_metrics_df, index=False)
+
+    eval_metrics_savepath = os.path.join(metric_dir, "eval_metrics.csv")
+    eval_metrics_df.to_csv(eval_metrics_df, index=False)
