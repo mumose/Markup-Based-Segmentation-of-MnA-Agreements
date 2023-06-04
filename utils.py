@@ -51,17 +51,21 @@ def get_label_list(config):
     return label_list, id2label, label2id
 
 
-def get_dataset(contract_dir, id2label, label2id, data_split=None):
+def get_dataset(contract_dir, id2label, label2id,
+                data_split, num_contracts=None):
     # get the list of contracts in the provided dir
-    contracts_list = glob.glob(os.path.join(contract_dir, "*.csv"))
+    contract_dir = os.path.join(contract_dir, "*.csv")
+    contracts_list = glob.glob(contract_dir)
 
     # if data split is provided then shuffle and select the first data_split
     # entries
-    if data_split:
+    if num_contracts:
         random.seed(42)
         random.shuffle(contracts_list)
 
-        contracts_list = contracts_list[:data_split]
+        contracts_list = contracts_list[:num_contracts]
+
+    print(f"Num contracts in {data_split}: {len(contracts_list)}; num_contracts arg: {num_contracts} ")
 
     data = []
     for tagged_path in contracts_list:
@@ -86,6 +90,7 @@ def get_class_dist(contract_dir, id2label, label2id):
     class_value_counts = consolidated_tagged_df_labels["tagged_sequence"].value_counts()
     total_examples = sum(class_value_counts.to_dict().values())
 
+    print(f"class weights, {len(label2id)}")
     class_weights = torch.zeros(len(label2id))
 
     for label_name, label_id in label2id.items():

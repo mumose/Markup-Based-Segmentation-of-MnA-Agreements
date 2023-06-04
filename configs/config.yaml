@@ -3,9 +3,9 @@
 data:
   data_split: null
 
-  train_contract_dir: ../labeling_old/contracts/tagged/train/
-  eval_contract_dir: ../labeling_old/contracts/tagged/eval/
-  test_contract_dir: ../labeling_old/contracts/tagged/test/
+  train_contract_dir: ../contracts/tagged/train/
+  eval_contract_dir: ../contracts/tagged/val/
+  test_contract_dir: ../contracts/tagged/test/
 
   label_list:
     - o
@@ -56,14 +56,15 @@ data:
 
 model:
   use_large_model: false
-  train_batch_size: 32
-  eval_batch_size: 16
+  train_batch_size: 2
+  eval_batch_size: 2
 
   num_epochs: 15
-  learning_rate: 5e-5
+  learning_rate: 5.0e-5
 
   # index to ignore in the loss_fn
   ignore_index: -100
+  max_length: 512
 
   collateral_dir: ../collateral/model_small/
   model_savepath: markuplm_model.pt

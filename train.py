@@ -1,8 +1,3 @@
-import warnings
-
-warnings.simplefilter(action="ignore", category=FutureWarning)
-warnings.simplefilter(action="ignore", category=UserWarning)
-
 import os
 import yaml
 import argparse
@@ -25,11 +20,11 @@ import input_pipeline
 
 # TODO: add tensorboard functionality
 # TODO: add new script for running inference on eval set and obtaining metrics
-# TODO: create slurm file for training on HPC
 # TODO: look into label alignment
 # TODO: is there value in labeling other subwords in each word
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device {device}")
 
 
 def run_train_loop(
@@ -72,7 +67,10 @@ def run_train_loop(
 
     predictions = outputs.logits.argmax(dim=-1)
     labels = batch["labels"]
-    preds, refs = utils.convert_preds_to_labels(predictions, labels, label_list, device)
+    preds, refs = utils.convert_preds_to_labels(predictions,
+                                                labels,
+                                                label_list,
+                                                device)
 
     train_metric.add_batch(
         predictions=preds,
@@ -82,9 +80,11 @@ def run_train_loop(
     return
 
 
-def run_eval_loop(eval_dataloader, model, device, eval_metric, config):
+def run_eval_loop(eval_dataloader, model, device,
+                  eval_metric, label_list, config):
     model.eval()
-    for batch in tqdm(eval_dataloader):
+    counter = 0
+    for batch in tqdm(eval_dataloader, desc='eval_loop'):
         # get the inputs;
         inputs = {k: v.to(device) for k, v in batch.items()}
 
@@ -96,9 +96,15 @@ def run_eval_loop(eval_dataloader, model, device, eval_metric, config):
 
         predictions = outputs.logits.argmax(dim=-1)
         labels = batch["labels"]
-        preds, refs = utils.get_labels(predictions, labels)
+        preds, refs = utils.convert_preds_to_labels(predictions,
+                                                    labels,
+                                                    label_list,
+                                                    device)
 
         eval_metric.add_batch(predictions=preds, references=refs)
+        counter += 1
+        if counter == 10:
+            break
 
     return
 
@@ -117,7 +123,8 @@ def main(config):
         config["data"]["train_contract_dir"],
         id2label,
         label2id,
-        config['data']['data_split']
+        data_split='train',
+        num_contracts=config['data']['data_split']
     )
 
     print("*" * 50)
@@ -128,11 +135,12 @@ def main(config):
         config["data"]["eval_contract_dir"],
         id2label,
         label2id,
-        data_split=None
+        data_split='eval',
+        num_contracts=1
     )
 
     print("*" * 50)
-    print(f'Using {config["model"]["use_large_model"]} model')
+    print(f'Using Large Model: {config["model"]["use_large_model"]}')
     print("*" * 50)
 
     # define the processor and model
@@ -179,7 +187,7 @@ def main(config):
     )
 
     # get the class weights used to weigh the different terms in the loss fn
-    class_weights = utils.get_class_dist(
+    class_value_counts, class_weights = utils.get_class_dist(
         config["data"]["train_contract_dir"], id2label, label2id
     )
 
@@ -187,14 +195,14 @@ def main(config):
     optimizer = AdamW(model.parameters(), lr=config["model"]["learning_rate"])
 
     loss_fct = nn.CrossEntropyLoss(
-        weight=torch.tensor(class_weights), ignore_index=config["model"]["ignore_index"]
+        weight=class_weights, ignore_index=config["model"]["ignore_index"]
     )
 
     # define the train and eval metric containers
     train_metric = evaluate.load("seqeval", scheme="BILOU", mode="strict")
     eval_metric = evaluate.load("seqeval", scheme="BILOU", mode="strict")
 
-    model = model.to(device)  # move to GPU if available
+    model.to(device)  # move to GPU if available
     num_epochs = config["model"]["num_epochs"]
 
     print("*" * 50)
@@ -202,12 +210,14 @@ def main(config):
     print("*" * 50)
 
     model.train()
-    best_eval_score = -float("int")
+    best_eval_score = -float("inf")
     num_epochs_lower_eval, best_epoch = 0, 0
     train_metrics_list, eval_metrics_list = [], []
     for epoch in range(num_epochs):
         model.train()
-        for train_batch in tqdm(train_dataloader):
+        counter = 0
+        for train_batch in tqdm(train_dataloader,
+                                desc='train_loop'):
             run_train_loop(
                 train_batch,
                 model,
@@ -218,9 +228,13 @@ def main(config):
                 label_list,
                 config,
             )
+            counter += 1
+            if counter == 10:
+                break
 
         # run eval loop
-        run_eval_loop(eval_dataloader, model, device, eval_metric, config)
+        run_eval_loop(eval_dataloader, model, device,
+                      eval_metric, label_list, config)
 
         # compute the metrics at the end of each epoch
         train_metrics = utils.compute_metrics(train_metric)
@@ -234,17 +248,20 @@ def main(config):
 
         # save the state dict for the best run
         if eval_metrics["overall_f1"] > best_eval_score:
-            model_savepath = config["model"]["model_savepath"].split(".")[0]
+            model_savepath = config["model"]["model_savepath"].rsplit(".", 1)[0]
             model_savepath = (
-                f"{model_savepath}_{epoch}_{eval_metrics['overall_f1']:0.3f}.pt"
+                f"{model_savepath}_epoch-{epoch}_f1-{eval_metrics['overall_f1']:0.3f}.pt"
             )
-            model_savepath = os.path.join(config['model']['collateral_dir'],
-                                          model_savepath)
+
+            print(f"Eval score improved. {best_eval_score} -> {eval_metrics['overall_f1']}")
+            print(f"Saving ckpt at {model_savepath}")
+
             torch.save(model.state_dict(), model_savepath)
 
             # reset the patience counter for early stopping
             num_epochs_lower_eval = 0
             best_epoch = epoch
+            best_eval_score = eval_metrics["overall_f1"]
 
         else:
             num_epochs_lower_eval += 1
@@ -293,19 +310,32 @@ if __name__ == "__main__":
     # create the associate collateral dir
     data_split = config['data']['data_split']
     if data_split:
-        collateral_dir = os.path.join(collateral_dir, str(data_split))
-        config['model']['collateral_dir'] = collateral_dir
+        collateral_dir = os.path.join(collateral_dir, f"num_contracts-{data_split}")
 
     if not os.path.exists(collateral_dir):
         os.makedirs(collateral_dir, exist_ok=True)
+
+    model_dir = os.path.join(collateral_dir, 'ckpt')
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir, exist_ok=True)
+
+        config['model']['model_savepath'] = \
+            os.path.join(model_dir,
+                         config['model']['model_savepath'])
 
     model, train_metrics_list, eval_metrics_list = main(config)
 
     train_metrics_df = pd.DataFrame(train_metrics_list)
     eval_metrics_df = pd.DataFrame(eval_metrics_list)
 
+    from IPython.display import display
+
+    display(train_metrics_df)
+
     train_metrics_savepath = os.path.join(collateral_dir, "train_metrics.csv")
-    train_metrics_df.to_csv(train_metrics_df, index=False)
+    train_metrics_df.to_csv(train_metrics_savepath, index=False)
+    print(f"saved train metrics at {train_metrics_savepath}")
 
     eval_metrics_savepath = os.path.join(collateral_dir, "eval_metrics.csv")
-    eval_metrics_df.to_csv(eval_metrics_df, index=False)
+    eval_metrics_df.to_csv(eval_metrics_savepath, index=False)
+    print(f"saved eval metrics at {eval_metrics_savepath}")

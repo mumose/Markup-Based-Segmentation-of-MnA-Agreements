@@ -12,7 +12,6 @@ class MarkupLMDataset(Dataset):
 
     def __init__(self, data, processor=None, max_length=512):
         self.data = data
-        print(f"Num of contracts in dataset = {len(self.data)}")
         self.processor = processor
         self.max_length = max_length
         self.encodings = []
