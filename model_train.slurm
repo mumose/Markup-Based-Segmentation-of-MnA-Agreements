@@ -15,5 +15,5 @@ singularity exec --nv --bind /scratch --overlay /scratch/str8775/conda_env/maud/
 source /ext3/env.sh
 conda activate maud
 cd /scratch/str8775/conda_env/maud/Markup-Based-Segmentation-of-MnA-Agreements
-python3 train.py --config=./configs/config_training_curves.yaml
+python3 train.py --config=./configs/config.yaml
 "

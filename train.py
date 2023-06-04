@@ -108,6 +108,10 @@ def main(config):
     # reverse mapping
     label_list, id2label, label2id = utils.get_label_list(config)
 
+    print("*" * 50)
+    print('Prepared Label List. Preparing Training Data ')
+    print("*" * 50)
+
     # preprocess the train and eval dataset
     train_data = utils.get_dataset(
         config["data"]["train_contract_dir"],
@@ -116,12 +120,20 @@ def main(config):
         config['data']['data_split']
     )
 
+    print("*" * 50)
+    print('Prepared Training Data. Preparing Eval Data ')
+    print("*" * 50)
+
     eval_data = utils.get_dataset(
         config["data"]["eval_contract_dir"],
         id2label,
         label2id,
         data_split=None
     )
+
+    print("*" * 50)
+    print(f'Using {config["model"]["use_large_model"]} model')
+    print("*" * 50)
 
     # define the processor and model
     if config["model"]["use_large_model"]:
@@ -183,12 +195,17 @@ def main(config):
     eval_metric = evaluate.load("seqeval", scheme="BILOU", mode="strict")
 
     model = model.to(device)  # move to GPU if available
+    num_epochs = config["model"]["num_epochs"]
+
+    print("*" * 50)
+    print(f'Running Training Loop for {num_epochs} epochs!')
+    print("*" * 50)
 
     model.train()
     best_eval_score = -float("int")
-    num_epochs_lower_eval = 0
+    num_epochs_lower_eval, best_epoch = 0, 0
     train_metrics_list, eval_metrics_list = [], []
-    for epoch in range(config["model"]["num_epochs"]):
+    for epoch in range(num_epochs):
         model.train()
         for train_batch in tqdm(train_dataloader):
             run_train_loop(
@@ -227,6 +244,8 @@ def main(config):
 
             # reset the patience counter for early stopping
             num_epochs_lower_eval = 0
+            best_epoch = epoch
+
         else:
             num_epochs_lower_eval += 1
             print(f"Eval f1 score did not improve. Patience={num_epochs_lower_eval}")
@@ -238,9 +257,13 @@ def main(config):
 
         if num_epochs_lower_eval >= config["model"]["early_stop_patience"]:
             print("*" * 50)
-            print("reached max patience limit. Stopping Training")
+            print(f"Finished Training Early. Best Epoch {best_epoch} ")
             print("*" * 50)
             break
+
+    print("*" * 50)
+    print(f'Finished Training. Best Eval Score {best_eval_score}')
+    print("*" * 50)
 
     return model, train_metrics_list, eval_metrics_list
 
@@ -257,6 +280,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    print("*" * 50)
+    print('Processing...')
+    print("*" * 50)
+
     with open(args.config, "r") as fh:
         config = yaml.safe_load(fh)
 
@@ -266,7 +293,7 @@ if __name__ == "__main__":
     # create the associate collateral dir
     data_split = config['data']['data_split']
     if data_split:
-        collateral_dir = os.path.join(collateral_dir, data_split)
+        collateral_dir = os.path.join(collateral_dir, str(data_split))
         config['model']['collateral_dir'] = collateral_dir
 
     if not os.path.exists(collateral_dir):
