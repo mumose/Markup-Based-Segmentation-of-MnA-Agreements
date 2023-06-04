@@ -110,43 +110,61 @@ def main(config):
 
     # preprocess the train and eval dataset
     train_data = utils.get_dataset(
-        config["data"]["train_contract_dir"], id2label, label2id
+        config["data"]["train_contract_dir"],
+        id2label,
+        label2id,
+        config['data']['data_split']
     )
 
     eval_data = utils.get_dataset(
-        config["data"]["eval_contract_dir"], id2label, label2id
+        config["data"]["eval_contract_dir"],
+        id2label,
+        label2id,
+        data_split=None
     )
 
-    processor = MarkupLMProcessor.from_pretrained(
-        "microsoft/markuplm-base", only_label_first_subword=False
-    )
+    # define the processor and model
+    if config["model"]["use_large_model"]:
+        processor = MarkupLMProcessor.from_pretrained(
+            "microsoft/markuplm-large", only_label_first_subword=True
+        )
+        model = MarkupLMForTokenClassification.from_pretrained(
+            "microsoft/markuplm-large", id2label=id2label, label2id=label2id
+        )
+
+    else:
+        processor = MarkupLMProcessor.from_pretrained(
+            "microsoft/markuplm-base", only_label_first_subword=True
+        )
+        model = MarkupLMForTokenClassification.from_pretrained(
+            "microsoft/markuplm-base", id2label=id2label, label2id=label2id
+        )
+
     processor.parse_html = False
 
     # convert the input dataset
     # to torch datasets. Create the dataloaders as well
     train_dataset = input_pipeline.MarkupLMDataset(
-        data=train_data, processor=processor, max_length=config["model"]["max_length"]
+        data=train_data,
+        processor=processor,
+        max_length=config["model"]["max_length"]
     )
     train_dataloader = DataLoader(
-        train_dataset, batch_size=config["model"]["train_batch_size"], shuffle=True
+        train_dataset,
+        batch_size=config["model"]["train_batch_size"],
+        shuffle=True
     )
 
     eval_dataset = input_pipeline.MarkupLMDataset(
-        data=eval_data, processor=processor, max_length=config["model"]["max_length"]
+        data=eval_data,
+        processor=processor,
+        max_length=config["model"]["max_length"]
     )
     eval_dataloader = DataLoader(
-        eval_dataset, batch_size=config["model"]["eval_batch_size"], shuffle=False
+        eval_dataset,
+        batch_size=config["model"]["eval_batch_size"],
+        shuffle=False
     )
-
-    # define the model
-    if config["model"]["use_large_model"]:
-        model = MarkupLMForTokenClassification.from_pretrained(
-            "microsoft/markuplm-large", id2label=id2label, label2id=label2id
-        )
-    else:
-        model = MarkupLMForTokenClassification.from_pretrained(
-            "microsoft/markuplm-base", id2label=id2label, label2id=label2id
-        )
 
     # get the class weights used to weigh the different terms in the loss fn
     class_weights = utils.get_class_dist(
@@ -203,6 +221,8 @@ def main(config):
             model_savepath = (
                 f"{model_savepath}_{epoch}_{eval_metrics['overall_f1']:0.3f}.pt"
             )
+            model_savepath = os.path.join(config['model']['collateral_dir'],
+                                          model_savepath)
             torch.save(model.state_dict(), model_savepath)
 
             # reset the patience counter for early stopping
@@ -240,21 +260,25 @@ if __name__ == "__main__":
     with open(args.config, "r") as fh:
         config = yaml.safe_load(fh)
 
-    model_dir = os.path.dirname(config['model']['model_savepath'])
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir, exist_ok=True)
+    collateral_dir = config['model']['collateral_dir']
 
-    metric_dir = config['model']['metric_dir']
-    if not os.path.exists(metric_dir):
-        os.makedirs(metric_dir, exist_ok=True)
+    # if data split is provided then we're running training curve exps,
+    # create the associate collateral dir
+    data_split = config['data']['data_split']
+    if data_split:
+        collateral_dir = os.path.join(collateral_dir, data_split)
+        config['model']['collateral_dir'] = collateral_dir
+
+    if not os.path.exists(collateral_dir):
+        os.makedirs(collateral_dir, exist_ok=True)
 
     model, train_metrics_list, eval_metrics_list = main(config)
 
     train_metrics_df = pd.DataFrame(train_metrics_list)
     eval_metrics_df = pd.DataFrame(eval_metrics_list)
 
-    train_metrics_savepath = os.path.join(metric_dir, "train_metrics.csv")
+    train_metrics_savepath = os.path.join(collateral_dir, "train_metrics.csv")
     train_metrics_df.to_csv(train_metrics_df, index=False)
 
-    eval_metrics_savepath = os.path.join(metric_dir, "eval_metrics.csv")
+    eval_metrics_savepath = os.path.join(collateral_dir, "eval_metrics.csv")
     eval_metrics_df.to_csv(eval_metrics_df, index=False)

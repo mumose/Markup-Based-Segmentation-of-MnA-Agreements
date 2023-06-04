@@ -1,9 +1,11 @@
 ---
 # dataset related params
 data:
-  train_contract_dir: ../labeling/contracts/tagged/train
-  eval_contract_dir: ../labeling/contracts/tagged/eval
-  test_contract_dir: ../labeling/contracts/tagged/test
+  data_split: null
+
+  train_contract_dir: ../labeling_old/contracts/tagged/train/
+  eval_contract_dir: ../labeling_old/contracts/tagged/eval/
+  test_contract_dir: ../labeling_old/contracts/tagged/test/
 
   label_list:
     - b_tn
@@ -42,29 +44,36 @@ data:
     - e_sssn
     - i_sssn
     - s_sssn
+    - b_ssssn
+    - e_ssssn
+    - i_ssssn
+    - s_ssssn
+    - b_sssst
+    - e_sssst
+    - i_sssst
+    - s_sssst
     - o
 
 model:
   use_large_model: false
-  train_batch_size: 16
-  eval_batch_size: 2
+  train_batch_size: 32
+  eval_batch_size: 16
 
-  num_epochs: 10
+  num_epochs: 15
   learning_rate: 5e-5
 
   # index to ignore in the loss_fn
   ignore_index: -100
 
-  model_savepath: ckpts/markuplm_model.pt
-  metric_dir: metrics
-  early_stop_patience: 2
+  collateral_dir: ../collateral/model_small/
+  model_savepath: markuplm_model.pt
+  early_stop_patience: 4
 
 ablation:
-  run_ablation: true
+  run_ablation: false
   is_shuffle_xpath_exp: false
   xpath_tag_pad_token: 216
   xpath_subs_pad_token: 1001
-
 
 
 ...

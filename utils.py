@@ -2,6 +2,7 @@ import os
 import glob
 import pandas as pd
 import torch
+import random
 
 import input_pipeline
 
@@ -50,9 +51,17 @@ def get_label_list(config):
     return label_list, id2label, label2id
 
 
-def get_dataset(contract_dir, id2label, label2id):
+def get_dataset(contract_dir, id2label, label2id, data_split=None):
     # get the list of contracts in the provided dir
     contracts_list = glob.glob(os.path.join(contract_dir, "*.csv"))
+
+    # if data split is provided then shuffle and select the first data_split
+    # entries
+    if data_split:
+        random.seed(42)
+        random.shuffle(contracts_list)
+
+        contracts_list = contracts_list[:data_split]
 
     data = []
     for tagged_path in contracts_list:
