@@ -56,6 +56,13 @@ class MarkupLMDataset(Dataset):
                     while encoding["labels"][end_idx] == -100:
                         end_idx = end_idx - 1
 
+                        # if the end idx is equal to the start idx meaning
+                        # we don't encounter a non -100 token,
+                        # we set window size as the max_length
+                        if end_idx == start_idx:
+                            end_idx = start_idx + self.max_length
+                            break
+
                     for k, v in encoding.items():
                         batch_encoding[k] = v[start_idx:end_idx]
 

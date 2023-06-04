@@ -8,6 +8,7 @@ data:
   test_contract_dir: ../labeling_old/contracts/tagged/test/
 
   label_list:
+    - o
     - b_tn
     - e_tn
     - i_tn
@@ -52,7 +53,6 @@ data:
     - e_sssst
     - i_sssst
     - s_sssst
-    - o
 
 model:
   use_large_model: false
