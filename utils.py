@@ -90,7 +90,6 @@ def get_class_dist(contract_dir, id2label, label2id):
     class_value_counts = consolidated_tagged_df_labels["tagged_sequence"].value_counts()
     total_examples = sum(class_value_counts.to_dict().values())
 
-    print(f"class weights, {len(label2id)}")
     class_weights = torch.zeros(len(label2id))
 
     for label_name, label_id in label2id.items():

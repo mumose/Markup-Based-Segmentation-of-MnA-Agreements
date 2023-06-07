@@ -1,7 +1,7 @@
 ---
 # dataset related params
 data:
-  data_split: null
+  data_split: 2
 
   train_contract_dir: ../contracts/tagged/train/
   eval_contract_dir: ../contracts/tagged/val/
@@ -59,20 +59,20 @@ model:
   train_batch_size: 8
   eval_batch_size: 8
 
-  num_epochs: 40
+  num_epochs: 300
   learning_rate: 5.0e-5
 
   # index to ignore in the loss_fn
   ignore_index: -100
   max_length: 512
 
-  collateral_dir: ../collateral/ablation/shuffle/small
-  model_savepath: markuplm_model_ablation_shuffle_run1.pt
+  collateral_dir: ../collateral/training_curves/
+  model_savepath: markuplm_model_run2_num_contract-3pct.pt
   early_stop_patience: 10
 
 ablation:
-  run_ablation: true
-  is_shuffle_xpath_exp: true
+  run_ablation: false
+  is_shuffle_xpath_exp: false
   xpath_tag_pad_token: 216
   xpath_subs_pad_token: 1001
 

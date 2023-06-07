@@ -1,25 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=
-#SBATCH --open-mode=append
-#SBATCH --output=/scratch/str8775/conda_env/maud/logs/slurm/%x_%j.out
-#SBATCH --error=/scratch/str8775/conda_env/maud/logs/slurm/%x_%j.err
-#SBATCH --export=ALL
-#SBATCH --time=7:00:00
-#SBATCH --gres=gpu:1
-#SBATCH --mem=16G
-
-export ENV=$1
-
-singularity exec --nv --bind /scratch --overlay /scratch/str8775/conda_env/rl_project/rl_project_env${ENV}.ext3:ro /scratch/str8775/conda_env/cuda11.6.124-cudnn8.4.0.27-devel-ubuntu20.04.4.sif /bin/bash -c "
-source /ext3/env_miniforge3.sh
-conda activate
-cd /scratch/str8775/conda_env/rl_project/RL-project-transfer-learning
-python3 train.py --config=./configs/hopper_stand_ppo_dmcnn.yaml
-"
-#!/bin/bash
-
-#SBATCH --job-name=ablation_shuffle
+#SBATCH --job-name=ablation_shuffle_run1
 #SBATCH --open-mode=append
 #SBATCH --output=/scratch/str8775/conda_env/maud/logs/ablation/shuffle/small/slurm/%x_%j.out
 #SBATCH --error=/scratch/str8775/conda_env/maud/logs/ablation/shuffle/small/slurm/%x_%j.err

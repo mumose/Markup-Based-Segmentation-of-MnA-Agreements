@@ -56,10 +56,10 @@ data:
 
 model:
   use_large_model: false
-  train_batch_size: 32
-  eval_batch_size: 16
+  train_batch_size: 8
+  eval_batch_size: 8
 
-  num_epochs: 15
+  num_epochs: 40
   learning_rate: 5.0e-5
 
   # index to ignore in the loss_fn
@@ -67,8 +67,8 @@ model:
   max_length: 512
 
   collateral_dir: ../collateral/ablation/mask/small
-  model_savepath: markuplm_model.pt
-  early_stop_patience: 4
+  model_savepath: markuplm_model_run2_ablation_mask.pt
+  early_stop_patience: 10
 
 ablation:
   run_ablation: true
