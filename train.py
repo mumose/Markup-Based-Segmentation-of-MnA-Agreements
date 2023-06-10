@@ -156,7 +156,7 @@ def main(config):
     # define the processor and model
     if config["model"]["use_large_model"]:
         processor = MarkupLMProcessor.from_pretrained(
-            "microsoft/markuplm-large", only_label_first_subword=True
+            "microsoft/markuplm-large", only_label_first_subword=False
         )
         model = MarkupLMForTokenClassification.from_pretrained(
             "microsoft/markuplm-large", id2label=id2label, label2id=label2id
@@ -164,7 +164,7 @@ def main(config):
 
     else:
         processor = MarkupLMProcessor.from_pretrained(
-            "microsoft/markuplm-base", only_label_first_subword=True
+            "microsoft/markuplm-base", only_label_first_subword=False
         )
         model = MarkupLMForTokenClassification.from_pretrained(
             "microsoft/markuplm-base", id2label=id2label, label2id=label2id

@@ -56,10 +56,10 @@ data:
 
 model:
   use_large_model: true
-  train_batch_size: 2
+  train_batch_size: 4
   eval_batch_size: 2
 
-  num_epochs: 10
+  num_epochs: 15
   learning_rate: 5.0e-5
 
   # index to ignore in the loss_fn
@@ -67,7 +67,7 @@ model:
   max_length: 512
 
   collateral_dir: ../collateral/model_large/
-  model_savepath: markuplm_large_model_run4_only_first_subword.pt
+  model_savepath: markuplm_large_model_run5_label_all.pt
   early_stop_patience: 3
 
 ablation:

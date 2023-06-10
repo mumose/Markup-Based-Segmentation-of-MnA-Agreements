@@ -1,13 +1,13 @@
 #!/bin/bash
 
-#SBATCH --job-name=ablation_shuffle_run1
+#SBATCH --job-name=65_ablation_shuffle_run4
 #SBATCH --open-mode=append
 #SBATCH --output=/scratch/str8775/conda_env/maud/logs/ablation/shuffle/small/slurm/%x_%j.out
 #SBATCH --error=/scratch/str8775/conda_env/maud/logs/ablation/shuffle/small/slurm/%x_%j.err
 #SBATCH --export=ALL
 #SBATCH --time=7:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --mem=16G
+#SBATCH --mem=32G
 
 export ENV=$1
 

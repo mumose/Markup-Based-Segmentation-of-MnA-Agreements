@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=ablation_mask
+#SBATCH --job-name=base-ablation_mask
 #SBATCH --open-mode=append
 #SBATCH --output=/scratch/str8775/conda_env/maud/logs/ablation/mask/small/slurm/%x_%j.out
 #SBATCH --error=/scratch/str8775/conda_env/maud/logs/ablation/mask/small/slurm/%x_%j.err
