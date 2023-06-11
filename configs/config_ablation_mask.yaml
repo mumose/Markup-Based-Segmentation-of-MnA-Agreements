@@ -1,7 +1,7 @@
 ---
 # dataset related params
 data:
-  data_split: 33
+  data_split: null
 
   train_contract_dir: ../contracts/tagged/train/
   eval_contract_dir: ../contracts/tagged/val/
@@ -56,6 +56,8 @@ data:
 
 model:
   use_large_model: false
+  label_only_first_subword: true
+
   train_batch_size: 8
   eval_batch_size: 8
 
@@ -75,6 +77,9 @@ ablation:
   is_shuffle_xpath_exp: false
   xpath_tag_pad_token: 216
   xpath_subs_pad_token: 1001
+
+predict:
+  model_path: null
 
 
 ...

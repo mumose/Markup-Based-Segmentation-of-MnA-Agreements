@@ -1,13 +1,13 @@
 #!/bin/bash
 
-#SBATCH --job-name=la-all-model_large_run5
+#SBATCH --job-name=hparam_run1
 #SBATCH --open-mode=append
-#SBATCH --output=/scratch/str8775/conda_env/maud/logs/model_large/slurm/%x_%j.out
-#SBATCH --error=/scratch/str8775/conda_env/maud/logs/model_large/slurm/%x_%j.err
+#SBATCH --output=/scratch/str8775/conda_env/maud/logs/hparam/slurm/%x_%j.out
+#SBATCH --error=/scratch/str8775/conda_env/maud/logs/hparam/slurm/%x_%j.err
 #SBATCH --export=ALL
 #SBATCH --time=7:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --mem=48G
+#SBATCH --mem=16G
 
 export ENV=$1
 
@@ -15,5 +15,6 @@ singularity exec --nv --bind /scratch --overlay /scratch/str8775/conda_env/maud/
 source /ext3/env.sh
 conda activate maud
 cd /scratch/str8775/conda_env/maud/Markup-Based-Segmentation-of-MnA-Agreements
-python3 train.py --config=./configs/config_large.yaml
+pip install -r requirements.txt --ignore-installed
+python3 train.py --config=./configs/hparam_config.yaml
 "

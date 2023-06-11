@@ -56,6 +56,8 @@ data:
 
 model:
   use_large_model: true
+  label_only_first_subword: true
+
   train_batch_size: 4
   eval_batch_size: 2
 
@@ -77,6 +79,6 @@ ablation:
   xpath_subs_pad_token: 1001
 
 predict:
-  model_path: /scratch/str8775/conda_env/maud/collateral/training_curves/num_contracts-33/ckpt/markuplm_model_run2_num_contract-30pct_epoch-13_f1-0.871.pt
+  model_path: null
 
 ...

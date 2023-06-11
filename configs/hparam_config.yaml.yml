@@ -1,7 +1,7 @@
 ---
 # dataset related params
 data:
-  data_split: 2
+  data_split: null
 
   train_contract_dir: ../contracts/tagged/train/
   eval_contract_dir: ../contracts/tagged/val/
@@ -56,18 +56,20 @@ data:
 
 model:
   use_large_model: false
+  label_only_first_subword: true
+
   train_batch_size: 8
   eval_batch_size: 8
 
-  num_epochs: 300
+  num_epochs: 20
   learning_rate: 5.0e-5
 
   # index to ignore in the loss_fn
   ignore_index: -100
   max_length: 512
 
-  collateral_dir: ../collateral/training_curves/
-  model_savepath: markuplm_model_run2_num_contract-3pct.pt
+  collateral_dir: ../collateral/hparam/
+  model_savepath: markuplm_small_model_run1.pt
   early_stop_patience: 10
 
 ablation:
@@ -77,5 +79,6 @@ ablation:
   xpath_subs_pad_token: 1001
 
 predict:
-  model_path: /scratch/str8775/conda_env/maud/collateral/training_curves/num_contracts-33/ckpt/markuplm_model_run2_num_contract-30pct_epoch-13_f1-0.871.pt
+  model_path: null
+
 ...

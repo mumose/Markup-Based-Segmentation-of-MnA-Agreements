@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=base-ablation_mask
+#SBATCH --job-name=mask_ablation_run1
 #SBATCH --open-mode=append
 #SBATCH --output=/scratch/str8775/conda_env/maud/logs/ablation/mask/small/slurm/%x_%j.out
 #SBATCH --error=/scratch/str8775/conda_env/maud/logs/ablation/mask/small/slurm/%x_%j.err
@@ -15,5 +15,6 @@ singularity exec --nv --bind /scratch --overlay /scratch/str8775/conda_env/maud/
 source /ext3/env.sh
 conda activate maud
 cd /scratch/str8775/conda_env/maud/Markup-Based-Segmentation-of-MnA-Agreements
+pip install -r requirements.txt --ignore-installed
 python3 train.py --config=./configs/config_ablation_mask.yaml
 "

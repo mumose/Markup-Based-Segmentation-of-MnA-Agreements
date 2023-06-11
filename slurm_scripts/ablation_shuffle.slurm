@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=65_ablation_shuffle_run4
+#SBATCH --job-name=shuffle_ablation_run1
 #SBATCH --open-mode=append
 #SBATCH --output=/scratch/str8775/conda_env/maud/logs/ablation/shuffle/small/slurm/%x_%j.out
 #SBATCH --error=/scratch/str8775/conda_env/maud/logs/ablation/shuffle/small/slurm/%x_%j.err
@@ -15,5 +15,6 @@ singularity exec --nv --bind /scratch --overlay /scratch/str8775/conda_env/maud/
 source /ext3/env.sh
 conda activate maud
 cd /scratch/str8775/conda_env/maud/Markup-Based-Segmentation-of-MnA-Agreements
+pip install -r requirements.txt --ignore-installed
 python3 train.py --config=./configs/config_ablation_shuffle.yaml
 "
