@@ -76,7 +76,7 @@ def compute_auprc(all_labels_bin, all_preds, metric_basename):
     fig = plt.gcf()
     plt.tight_layout()
 
-    fig.savefig(f'{metric_basename}.png')
+    fig.savefig(f'{metric_basename}_pr_curve.png')
 
     return average_precision["macro"]
 
