@@ -342,5 +342,7 @@ if __name__ == "__main__":
     best_hparams = best_trial.params
 
     # Save the best hyperparameters to a JSON file
-    with open("best_hparams.json", "w") as f:
+    outpath = os.path.join(config['model']['collateral_dir'],
+                           "best_hparams.json")
+    with open(outpath, "w") as f:
         json.dump(best_hparams, f)
