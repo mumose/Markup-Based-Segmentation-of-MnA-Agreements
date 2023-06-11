@@ -10,12 +10,13 @@ import torch
 import evaluate
 from torch import nn
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 
 from transformers import MarkupLMProcessor
 from transformers import MarkupLMForTokenClassification
 from transformers import set_seed
-# from torchmetrics import Precision
+
 
 import utils
 import input_pipeline
@@ -28,7 +29,7 @@ print(f"Using device {device}")
 set_seed(42)
 
 
-def run_train_loop(batch, model, optimizer, loss_fct,
+def run_train_loop(batch, model, optimizer, scheduler, loss_fct,
                    device, train_metric, label_list, config):
     '''Runs train loop for one batch of input
 
@@ -37,6 +38,7 @@ def run_train_loop(batch, model, optimizer, loss_fct,
             required for forward pass of MarkupLM
         model: transformers.PreTrainedModel. fine-tuned MarkupLM model
         optimizer: torch.optim.AdamW Optimizer used for training
+        scheduler: torch.optim.lr_scheduler.StepLR Learning rate scheduler
         loss_fct: torch.nn.CrossEntropyLoss. Loss function used for training
         device: torch.device. Specifies whether GPU is available for computation
         train_metric: evaluate.seqeval. The metric used for
@@ -81,6 +83,7 @@ def run_train_loop(batch, model, optimizer, loss_fct,
 
     loss.backward()
     optimizer.step()
+    scheduler.step()
 
     print("Train Loss:", loss.item())
 
@@ -226,6 +229,9 @@ def main(config):
 
     # define the optimizer and loss fct
     optimizer = AdamW(model.parameters(), lr=config["model"]["learning_rate"])
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
+                                                step_size=2,
+                                                gamma=0.1)
 
     loss_fct = nn.CrossEntropyLoss(
         weight=class_weights.to(device),
@@ -234,12 +240,12 @@ def main(config):
 
     # define the train and eval metric containers
     train_metric = evaluate.load("seqeval",
-                                 scheme="BILOU",
+                                 scheme="IOBES",
                                  mode="strict",
                                  experiment_id="train",
                                  keep_in_memory=True)
     eval_metric = evaluate.load("seqeval",
-                                scheme="BILOU",
+                                scheme="IOBES",
                                 mode="strict",
                                 experiment_id='eval',
                                 keep_in_memory=True)
@@ -259,7 +265,7 @@ def main(config):
         model.train()
         for train_batch in tqdm(train_dataloader,
                                 desc='train_loop'):
-            run_train_loop(train_batch, model, optimizer, loss_fct,
+            run_train_loop(train_batch, model, optimizer, scheduler, loss_fct,
                            device, train_metric, label_list, config)
 
         # run eval loop
