@@ -76,5 +76,6 @@ ablation:
   xpath_tag_pad_token: 216
   xpath_subs_pad_token: 1001
 
-
+predict:
+  model_path: /scratch/str8775/conda_env/maud/collateral/training_curves/num_contracts-33/ckpt/markuplm_model_run2_num_contract-30pct_epoch-13_f1-0.871.pt
 ...

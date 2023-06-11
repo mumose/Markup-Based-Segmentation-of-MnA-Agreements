@@ -78,7 +78,8 @@ def get_dataset(contract_dir, id2label, label2id,
     return data
 
 
-def get_class_dist(contract_dir, id2label, label2id):
+def get_class_dist(contract_dir, id2label, label2id,
+                   mode='inverse'):
     # get the list of contracts in the provided dir
     contracts_list = glob.glob(os.path.join(contract_dir, "*.csv"))
 
@@ -92,14 +93,27 @@ def get_class_dist(contract_dir, id2label, label2id):
 
     class_weights = torch.zeros(len(label2id))
 
-    for label_name, label_id in label2id.items():
-        class_count = class_value_counts.get(label_name, total_examples)
-        class_weights[label_id] = total_examples / class_count
+    # if in inverse mode then compute the ratio of
+    # total_examples / num_ex_per_class else compute the inverse of this ratio
+    if mode == 'inverse':
+        for label_name, label_id in label2id.items():
+            # if no examples for that class are present
+            # then the weight of that class is 1
+            class_count = class_value_counts.get(label_name, total_examples)
+            class_weights[label_id] = total_examples / class_count
+    elif mode == 'normal':
+        for label_name, label_id in label2id.items():
+            # if no examples for that class are present
+            # then the weight of that class is 0
+            class_count = class_value_counts.get(label_name, 0)
+            class_weights[label_id] = class_count / total_examples
 
     return class_value_counts, class_weights
 
 
-def convert_preds_to_labels(predictions, references, label_list, device="cpu"):
+def convert_preds_to_labels(predictions, references,
+                            label_list, device="cpu",
+                            ignore_index=-100):
     # Transform predictions and references tensos to numpy arrays
     if device.type == "cpu":
         y_pred = predictions.detach().clone().numpy()
@@ -110,11 +124,11 @@ def convert_preds_to_labels(predictions, references, label_list, device="cpu"):
 
     # Remove ignored index (special tokens)
     true_predictions = [
-        [label_list[p] for (p, l) in zip(pred, gold_label) if l != -100]
+        [label_list[p] for (p, l) in zip(pred, gold_label) if l != ignore_index]
         for pred, gold_label in zip(y_pred, y_true)
     ]
     true_labels = [
-        [label_list[l] for (p, l) in zip(pred, gold_label) if l != -100]
+        [label_list[l] for (p, l) in zip(pred, gold_label) if l != ignore_index]
         for pred, gold_label in zip(y_pred, y_true)
     ]
     return true_predictions, true_labels
