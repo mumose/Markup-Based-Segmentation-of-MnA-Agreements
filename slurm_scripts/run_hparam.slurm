@@ -16,5 +16,5 @@ source /ext3/env.sh
 conda activate maud
 cd /scratch/str8775/conda_env/maud/Markup-Based-Segmentation-of-MnA-Agreements
 pip install -r requirements.txt --ignore-installed
-python3 train.py --config=./configs/hparam_config.yaml
+python3 hparam_tuning.py --config=./configs/hparam_config.yaml
 "
