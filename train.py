@@ -175,12 +175,14 @@ def main(config):
 
     print("*" * 50)
     print(f'Using Large Model: {config["model"]["use_large_model"]}')
+    print(f"Label only first subword: {config['model']['label_only_first_subword']}")
     print("*" * 50)
 
     # define the processor and model
     if config["model"]["use_large_model"]:
         processor = MarkupLMProcessor.from_pretrained(
-            "microsoft/markuplm-large", only_label_first_subword=False
+            "microsoft/markuplm-large",
+            only_label_first_subword=config['model']['label_only_first_subword']
         )
         model = MarkupLMForTokenClassification.from_pretrained(
             "microsoft/markuplm-large", id2label=id2label, label2id=label2id
@@ -188,7 +190,8 @@ def main(config):
 
     else:
         processor = MarkupLMProcessor.from_pretrained(
-            "microsoft/markuplm-base", only_label_first_subword=False
+            "microsoft/markuplm-base",
+            only_label_first_subword=config['model']['label_only_first_subword']
         )
         model = MarkupLMForTokenClassification.from_pretrained(
             "microsoft/markuplm-base", id2label=id2label, label2id=label2id

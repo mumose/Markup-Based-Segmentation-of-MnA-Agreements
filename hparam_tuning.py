@@ -1,5 +1,6 @@
 import os
 import yaml
+import json
 import argparse
 import pandas as pd
 
@@ -175,12 +176,14 @@ def objecrive(trial, config):
 
     print("*" * 50)
     print(f'Using Large Model: {config["model"]["use_large_model"]}')
+    print(f"Label only first subword: {config['model']['label_only_first_subword']}")
     print("*" * 50)
 
     # define the processor and model
     if config["model"]["use_large_model"]:
         processor = MarkupLMProcessor.from_pretrained(
-            "microsoft/markuplm-large", only_label_first_subword=False
+            "microsoft/markuplm-large",
+            only_label_first_subword=config['model']['label_only_first_subword']
         )
         model = MarkupLMForTokenClassification.from_pretrained(
             "microsoft/markuplm-large", id2label=id2label, label2id=label2id
@@ -188,7 +191,8 @@ def objecrive(trial, config):
 
     else:
         processor = MarkupLMProcessor.from_pretrained(
-            "microsoft/markuplm-base", only_label_first_subword=False
+            "microsoft/markuplm-base",
+            only_label_first_subword=config['model']['label_only_first_subword']
         )
         model = MarkupLMForTokenClassification.from_pretrained(
             "microsoft/markuplm-base", id2label=id2label, label2id=label2id
@@ -333,3 +337,10 @@ if __name__ == "__main__":
     study = optuna.create_study(direction="maximize")
     study.optimize(lambda trial: objective(trial, config), n_trials=10)
 
+    # Get the best hyperparameters
+    best_trial = study.best_trial
+    best_hparams = best_trial.params
+
+    # Save the best hyperparameters to a JSON file
+    with open("best_hparams.json", "w") as f:
+        json.dump(best_hparams, f)
