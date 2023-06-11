@@ -12,7 +12,6 @@ import evaluate
 from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
-
 from transformers import MarkupLMProcessor
 from transformers import MarkupLMForTokenClassification
 from transformers import set_seed
@@ -260,7 +259,7 @@ def main(config):
 
     # create contrainer for computing test metrics
     test_metric = evaluate.load("seqeval",
-                                scheme="BILOU",
+                                scheme="IOBES",
                                 mode="strict",
                                 experiment_id='test',
                                 keep_in_memory=True)
