@@ -4,6 +4,7 @@ import argparse
 import pandas as pd
 
 from tqdm.auto import tqdm
+from IPython.display import display
 
 import torch
 import evaluate
@@ -20,11 +21,6 @@ import utils
 import input_pipeline
 
 
-# TODO: add tensorboard functionality
-# TODO: add new script for running inference on eval set and obtaining metrics
-# TODO: look into label alignment
-# TODO: is there value in labeling other subwords in each word
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device {device}")
 
@@ -32,12 +28,30 @@ print(f"Using device {device}")
 set_seed(42)
 
 
-def run_train_loop(
-    batch, model, optimizer, loss_fct, device, train_metric, label_list, config
-):
-    # get the inputs;
+def run_train_loop(batch, model, optimizer, loss_fct,
+                   device, train_metric, label_list, config):
+    '''Runs train loop for one batch of input
+
+    Args:
+        batch: dict[torch.Tensor]. Dict containing input tensors
+            required for forward pass of MarkupLM
+        model: transformers.PreTrainedModel. fine-tuned MarkupLM model
+        optimizer: torch.optim.AdamW Optimizer used for training
+        loss_fct: torch.nn.CrossEntropyLoss. Loss function used for training
+        device: torch.device. Specifies whether GPU is available for computation
+        train_metric: evaluate.seqeval. The metric used for
+            computing the f1-score
+        label_list: list. List of labels used to train the MarkupLM model
+        config: dict. Contains user-provided params and args
+
+    Returns:
+        None
+    '''
+    # get the inputs
     inputs = {k: v.to(device) for k, v in batch.items()}
 
+    # if ablation mode is set to true then
+    # either mask the xpaths or shuffle them
     if config["ablation"]["run_ablation"]:
         inputs = utils.ablation(config, inputs)
 
@@ -47,11 +61,12 @@ def run_train_loop(
     # forward + backward + optimize
     outputs = model(**inputs)
 
-    # get the logits
+    # get the logits, labels
     logits = outputs.logits
-
-    attention_mask = inputs["attention_mask"]
     labels = inputs["labels"]
+
+    # get the attention mask to determine valid tokens
+    attention_mask = inputs["attention_mask"]
 
     # Only keep active parts of the loss
     num_labels = len(label_list)
@@ -64,14 +79,13 @@ def run_train_loop(
     )
     loss = loss_fct(active_logits, active_labels)
 
-    # loss = outputs.loss
     loss.backward()
     optimizer.step()
 
     print("Train Loss:", loss.item())
 
     predictions = outputs.logits.argmax(dim=-1)
-    labels = batch["labels"]
+    # labels = batch["labels"]
     preds, refs = utils.convert_preds_to_labels(predictions,
                                                 labels,
                                                 label_list,
@@ -87,11 +101,26 @@ def run_train_loop(
 
 def run_eval_loop(dataloader, model, device,
                   metric, label_list, config):
+    '''Runs eval loop for entire dataset
+
+    Args:
+        dataloader: torch.utils.data.DataLoader: iterator over Dataset object
+        model: transformers.PreTrainedModel. fine-tuned MarkupLM model
+        device: torch.device. Specifies whether GPU is available for computation
+        metric: evaluate.seqeval. The metric used for computing the f1-score
+        label_list: list. List of labels used to train the MarkupLM model
+        config: dict. Contains user-provided params and args
+
+    Returns:
+        None
+    '''
     model.eval()
     for batch in tqdm(dataloader, desc='eval_loop'):
         # get the inputs;
         inputs = {k: v.to(device) for k, v in batch.items()}
 
+        # if ablation mode is set to true then
+        # either mask the xpaths or shuffle them
         if config["ablation"]["run_ablation"]:
             inputs = utils.ablation(config, inputs)
 
@@ -107,11 +136,11 @@ def run_eval_loop(dataloader, model, device,
 
         metric.add_batch(predictions=preds, references=refs)
 
-
     return
 
 
 def main(config):
+    '''Main execution of script'''
     # get the  list of labels along with the label to id mapping and
     # reverse mapping
     label_list, id2label, label2id = utils.get_label_list(config)
@@ -138,14 +167,6 @@ def main(config):
         id2label,
         label2id,
         data_split='eval',
-        num_contracts=None
-    )
-
-    test_data = utils.get_dataset(
-        config["data"]["test_contract_dir"],
-        id2label,
-        label2id,
-        data_split='test',
         num_contracts=None
     )
 
@@ -197,22 +218,11 @@ def main(config):
         shuffle=False
     )
 
-    ## TEST Set
-    test_dataset = input_pipeline.MarkupLMDataset(
-        data=test_data,
-        processor=processor,
-        max_length=config["model"]["max_length"]
-    )
-    test_dataloader = DataLoader(
-        test_dataset,
-        batch_size=1,
-        shuffle=False
-    )
-
     # get the class weights used to weigh the different terms in the loss fn
-    class_value_counts, class_weights = utils.get_class_dist(
-        config["data"]["train_contract_dir"], id2label, label2id
-    )
+    class_value_counts, class_weights = utils.get_class_dist(config["data"]["train_contract_dir"],
+                                                             id2label,
+                                                             label2id,
+                                                             mode='inverse')
 
     # define the optimizer and loss fct
     optimizer = AdamW(model.parameters(), lr=config["model"]["learning_rate"])
@@ -234,13 +244,6 @@ def main(config):
                                 experiment_id='eval',
                                 keep_in_memory=True)
 
-    test_metric = evaluate.load("seqeval",
-                                scheme="BILOU",
-                                mode="strict",
-                                experiment_id='test',
-                                keep_in_memory=True)
-
-
     model.to(device)  # move to GPU if available
     num_epochs = config["model"]["num_epochs"]
 
@@ -256,16 +259,8 @@ def main(config):
         model.train()
         for train_batch in tqdm(train_dataloader,
                                 desc='train_loop'):
-            run_train_loop(
-                train_batch,
-                model,
-                optimizer,
-                loss_fct,
-                device,
-                train_metric,
-                label_list,
-                config,
-            )
+            run_train_loop(train_batch, model, optimizer, loss_fct,
+                           device, train_metric, label_list, config)
 
         # run eval loop
         run_eval_loop(eval_dataloader, model, device,
@@ -287,6 +282,8 @@ def main(config):
             model_savepath = (
                 f"{model_savepath}_epoch-{epoch}_f1-{eval_metrics['overall_f1']:0.3f}.pt"
             )
+            # update the config file model savepath entry
+            config['model']['model_savepath'] = model_savepath
 
             print(f"Eval score improved. {best_eval_score} -> {eval_metrics['overall_f1']}")
             print(f"Saving ckpt at {model_savepath}")
@@ -300,16 +297,18 @@ def main(config):
 
         else:
             num_epochs_lower_eval += 1
-            print(f"Eval f1 score did not improve. Patience={num_epochs_lower_eval}")
+            patience = config["model"]["early_stop_patience"]
+            print(f"Eval f1 score did not improve!"+
+                  f"Best Eval score={best_eval_score}" +
+                  f"Patience={patience - num_epochs_lower_eval}")
 
-        print(
-            f"Epoch {epoch} Train Metrics: {train_metrics}"
-            + f"\n\nEval Metrics: {eval_metrics}"
-        )
+        print(f"Epoch {epoch} Train Metrics: {train_metrics}" +
+              f"\n\nEval Metrics: {eval_metrics}")
 
         if num_epochs_lower_eval >= config["model"]["early_stop_patience"]:
             print("*" * 50)
-            print(f"Finished Training Early. Best Epoch {best_epoch} ")
+            print(f"Finished Training Early. Best Epoch {best_epoch}" +
+                  f"Best Eval Score: {best_eval_score}")
             print("*" * 50)
             break
 
@@ -317,15 +316,7 @@ def main(config):
     print(f'Finished Training. Best Eval Score {best_eval_score}')
     print("*" * 50)
 
-
-    print("Running Prediction Loop")
-    run_eval_loop(test_dataloader, model, device,
-                    test_metric, label_list, config)
-
-    # compute the metrics at the end of each epoch
-    test_metrics = utils.compute_metrics(test_metric)
-
-    return model, train_metrics_list, eval_metrics_list, [test_metrics]
+    return model, train_metrics_list, eval_metrics_list
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -366,25 +357,23 @@ if __name__ == "__main__":
                         config['model']['model_savepath'])
 
 
-    model, train_metrics_list, eval_metrics_list, test_metrics = main(config)
+    model, train_metrics_list, eval_metrics_list = main(config)
 
     train_metrics_df = pd.DataFrame(train_metrics_list)
     eval_metrics_df = pd.DataFrame(eval_metrics_list)
-    test_metrics_df = pd.DataFrame(test_metrics)
-
-    from IPython.display import display
 
     display(eval_metrics_df)
+    metric_basename = config['model']['model_savepath']
+    metric_basename = os.path.basename(metric_basename).rsplit('.')[0]
+    metric_basename = os.path.join(config['model']['collateral_dir'],
+                                   metric_basename)
 
-    train_metrics_savepath = os.path.join(collateral_dir, "train_metrics.csv")
+    train_metrics_savepath = os.path.join(collateral_dir,
+                                          f"{metric_basename}_train_metrics.csv")
     train_metrics_df.to_csv(train_metrics_savepath, index=False)
     print(f"saved train metrics at {train_metrics_savepath}")
 
-    eval_metrics_savepath = os.path.join(collateral_dir, "eval_metrics.csv")
+    eval_metrics_savepath = os.path.join(collateral_dir,
+                                         f"{metric_basename}_eval_metrics.csv")
     eval_metrics_df.to_csv(eval_metrics_savepath, index=False)
     print(f"saved eval metrics at {eval_metrics_savepath}")
-
-    test_metrics_savepath = os.path.join(collateral_dir, "test_metrics.csv")
-    test_metrics_df.to_csv(test_metrics_savepath, index=False)
-    display(test_metrics_df)
-    print(f"saved test metrics at {test_metrics_savepath}")
