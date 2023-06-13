@@ -18,6 +18,9 @@ from transformers import MarkupLMProcessor
 from transformers import MarkupLMForTokenClassification
 from transformers import set_seed
 
+import optuna
+from ray import tune
+from ray.tune.search.optuna import OptunaSearch
 
 import utils
 import input_pipeline
@@ -31,7 +34,7 @@ set_seed(42)
 
 
 def run_train_loop(batch, model, optimizer, scheduler, loss_fct,
-                   device, train_metric, label_list, config):
+                   device, train_metric, label_list, usr_cfg):
     '''Runs train loop for one batch of input
 
     Args:
@@ -55,8 +58,8 @@ def run_train_loop(batch, model, optimizer, scheduler, loss_fct,
 
     # if ablation mode is set to true then
     # either mask the xpaths or shuffle them
-    if config["ablation"]["run_ablation"]:
-        inputs = utils.ablation(config, inputs)
+    if user_cfg["ablation"]["run_ablation"]:
+        inputs = utils.ablation(user_cfg, inputs)
 
     # zero the parameter gradients
     optimizer.zero_grad()
@@ -104,7 +107,7 @@ def run_train_loop(batch, model, optimizer, scheduler, loss_fct,
 
 
 def run_eval_loop(dataloader, model, device,
-                  metric, label_list, config):
+                  metric, label_list, user_cfg):
     '''Runs eval loop for entire dataset
 
     Args:
@@ -125,8 +128,8 @@ def run_eval_loop(dataloader, model, device,
 
         # if ablation mode is set to true then
         # either mask the xpaths or shuffle them
-        if config["ablation"]["run_ablation"]:
-            inputs = utils.ablation(config, inputs)
+        if user_cfg["ablation"]["run_ablation"]:
+            inputs = utils.ablation(user_cfg, inputs)
 
         # forward + backward + optimize
         outputs = model(**inputs)
@@ -143,11 +146,20 @@ def run_eval_loop(dataloader, model, device,
     return
 
 
-def objecrive(trial, config):
+def objective(config):
     '''Main execution of script'''
+
+    user_cfg = config['user_cfg']
+
+    print("*" * 50)
+    print("user_cfg", user_cfg)
+    print("user_cfg data", user_cfg["data"])
+    print("CWD", os.getcwd())
+    print("*" * 50)
+
     # get the  list of labels along with the label to id mapping and
     # reverse mapping
-    label_list, id2label, label2id = utils.get_label_list(config)
+    label_list, id2label, label2id = utils.get_label_list(user_cfg)
 
     print("*" * 50)
     print('Prepared Label List. Preparing Training Data ')
@@ -155,11 +167,11 @@ def objecrive(trial, config):
 
     # preprocess the train and eval dataset
     train_data = utils.get_dataset(
-        config["data"]["train_contract_dir"],
+        user_cfg["data"]["train_contract_dir"],
         id2label,
         label2id,
         data_split='train',
-        num_contracts=config['data']['data_split']
+        num_contracts=user_cfg['data']['data_split']
     )
 
     print("*" * 50)
@@ -167,7 +179,7 @@ def objecrive(trial, config):
     print("*" * 50)
 
     eval_data = utils.get_dataset(
-        config["data"]["eval_contract_dir"],
+        user_cfg["data"]["eval_contract_dir"],
         id2label,
         label2id,
         data_split='eval',
@@ -175,15 +187,15 @@ def objecrive(trial, config):
     )
 
     print("*" * 50)
-    print(f'Using Large Model: {config["model"]["use_large_model"]}')
-    print(f"Label only first subword: {config['model']['label_only_first_subword']}")
+    print(f'Using Large Model: {user_cfg["model"]["use_large_model"]}')
+    print(f"Label only first subword: {user_cfg['model']['label_only_first_subword']}")
     print("*" * 50)
 
     # define the processor and model
-    if config["model"]["use_large_model"]:
+    if user_cfg["model"]["use_large_model"]:
         processor = MarkupLMProcessor.from_pretrained(
             "microsoft/markuplm-large",
-            only_label_first_subword=config['model']['label_only_first_subword']
+            only_label_first_subword=user_cfg['model']['label_only_first_subword']
         )
         model = MarkupLMForTokenClassification.from_pretrained(
             "microsoft/markuplm-large", id2label=id2label, label2id=label2id
@@ -192,7 +204,7 @@ def objecrive(trial, config):
     else:
         processor = MarkupLMProcessor.from_pretrained(
             "microsoft/markuplm-base",
-            only_label_first_subword=config['model']['label_only_first_subword']
+            only_label_first_subword=user_cfg['model']['label_only_first_subword']
         )
         model = MarkupLMForTokenClassification.from_pretrained(
             "microsoft/markuplm-base", id2label=id2label, label2id=label2id
@@ -205,35 +217,56 @@ def objecrive(trial, config):
     train_dataset = input_pipeline.MarkupLMDataset(
         data=train_data,
         processor=processor,
-        max_length=config["model"]["max_length"]
+        max_length=user_cfg["model"]["max_length"]
     )
 
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=config["model"]["train_batch_size"],
+        batch_size=user_cfg["model"]["train_batch_size"],
         shuffle=True
     )
 
     eval_dataset = input_pipeline.MarkupLMDataset(
         data=eval_data,
         processor=processor,
-        max_length=config["model"]["max_length"]
+        max_length=user_cfg["model"]["max_length"]
     )
     eval_dataloader = DataLoader(
         eval_dataset,
-        batch_size=config["model"]["eval_batch_size"],
+        batch_size=user_cfg["model"]["eval_batch_size"],
         shuffle=False
     )
 
     # get the class weights used to weigh the different terms in the loss fn
-    class_value_counts, class_weights = utils.get_class_dist(config["data"]["train_contract_dir"],
+    class_value_counts, class_weights = utils.get_class_dist(user_cfg["data"]["train_contract_dir"],
                                                              id2label,
                                                              label2id,
                                                              mode='inverse')
 
     # Define hyperparameters to tune
-    lr = trial.suggest_float("learning_rate", 5e-6, 5e-2, log=True)
-    num_epochs = trial.suggest_int("num_epochs", 1, 20)
+    num_epochs = config['num_epochs']
+    lr = config['lr']
+
+    # num_epoch_dict = config['hparams'].get('num_epochs')
+    # if num_epoch_dict is not None:
+    #     num_epochs_low = num_epoch_dict['low']
+    #     num_epochs_high = num_epoch_dict['high']
+
+    # lr_dict = config['hparams'].get('lr')
+    # if lr_dict is not None:
+    #     lr_low = lr_dict['low']
+    #     lr_high = lr_dict['high']
+
+    # lr = trial.suggest_float("learning_rate",
+    #                          lr_low,
+    #                          lr_high,
+    #                          log=True)
+
+    # num_epochs = trial.suggest_int("num_epochs",
+    #                                num_epochs_low,
+    #                                num_epochs_high)
+
+
 
     # define the optimizer and loss fct
     optimizer = AdamW(model.parameters(), lr)
@@ -243,7 +276,7 @@ def objecrive(trial, config):
 
     loss_fct = nn.CrossEntropyLoss(
         weight=class_weights.to(device),
-        ignore_index=config["model"]["ignore_index"]
+        ignore_index=user_cfg["model"]["ignore_index"]
     )
 
     # define the train and eval metric containers
@@ -271,11 +304,11 @@ def objecrive(trial, config):
         for train_batch in tqdm(train_dataloader,
                                 desc='train_loop'):
             run_train_loop(train_batch, model, optimizer, scheduler, loss_fct,
-                           device, train_metric, label_list, config)
+                           device, train_metric, label_list, user_cfg)
 
         # run eval loop
         run_eval_loop(eval_dataloader, model, device,
-                      eval_metric, label_list, config)
+                      eval_metric, label_list, user_cfg)
 
         # compute the metrics at the end of each epoch
         train_metrics = utils.compute_metrics(train_metric)
@@ -287,13 +320,18 @@ def objecrive(trial, config):
         eval_metrics['epoch'] = epoch
         eval_metrics_list.append(eval_metrics)
 
-        trial.report(eval_metrics['overall_f1'], epoch)
+        eval_f1 = eval_metrics['overall_f1']
+        print(f"eval_f1={eval_f1}")
+        # trial.report(eval_f1, epoch)
 
-        # Check if the trial should be pruned
-        if trial.should_prune():
-            raise optuna.exceptions.TrialPruned()
+        # # Check if the trial should be pruned
+        # if trial.should_prune():
+        #     raise optuna.exceptions.TrialPruned()
 
-    return eval_metrics_list
+    # Report the results to Ray Tune
+    tune.report(eval_f1=eval_f1)
+
+    return
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -312,13 +350,13 @@ if __name__ == "__main__":
     print("*" * 50)
 
     with open(args.config, "r") as fh:
-        config = yaml.safe_load(fh)
+        user_cfg = yaml.safe_load(fh)
 
-    collateral_dir = config['model']['collateral_dir']
+    collateral_dir = user_cfg['model']['collateral_dir']
 
     # if data split is provided then we're running training curve exps,
     # create the associate collateral dir
-    data_split = config['data']['data_split']
+    data_split = user_cfg['data']['data_split']
     if data_split:
         collateral_dir = os.path.join(collateral_dir, f"num_contracts-{data_split}")
 
@@ -329,20 +367,71 @@ if __name__ == "__main__":
     if not os.path.exists(model_dir):
         os.makedirs(model_dir, exist_ok=True)
 
-    config['model']['model_savepath'] = \
+    user_cfg['model']['model_savepath'] = \
         os.path.join(model_dir,
-                        config['model']['model_savepath'])
+                        user_cfg['model']['model_savepath'])
 
+    # create study name using available hparams that are being tuned
+    num_epochs_dict = user_cfg['hparams'].get('num_epochs')
+    if num_epochs_dict is not None:
+        num_epochs_low = num_epochs_dict['low']
+        num_epochs_high = num_epochs_dict['high']
+        user_cfg['study_name'] = f"num_epochs_{num_epochs_low}-{num_epochs_high}_{user_cfg['study_name']}"
 
-    study = optuna.create_study(direction="maximize")
-    study.optimize(lambda trial: objective(trial, config), n_trials=10)
+    lr_dict = user_cfg['hparams'].get('lr')
+    if lr_dict is not None:
+        lr_low = lr_dict['low']
+        lr_high = lr_dict['high']
+        user_cfg['study_name'] = f"lr_{lr_low}-{lr_high}_{user_cfg['study_name']}"
 
+    # study = optuna.create_study(direction="maximize",
+    #                             study_name=config['study_name'])
+
+    # study.optimize(lambda trial: objective(trial, config), n_trials=10)
+
+    # # Get the best hyperparameters
+    # best_trial = study.best_trial
+    # best_hparams = best_trial.params
+
+    # # Save the best hyperparameters to a JSON file
+    # outpath = os.path.join(config['model']['collateral_dir'],
+    #                        "best_hparams.json")
+    # with open(outpath, "w") as f:
+    #     json.dump(best_hparams, f)
+
+    # Define the search space
+    config = {
+        "lr": tune.loguniform(lr_low,
+                              lr_high),
+        "num_epochs": tune.choice([2, 4, 6])
+}
+    algo = OptunaSearch()
+
+    config['user_cfg'] = user_cfg
+
+    # Run the hyperparameter search
+    tuner = tune.Tuner(
+        tune.with_resources(
+            tune.with_parameters(objective),
+            # lambda config, user_cfg: objective(config, user_cfg),
+            resources={"cpu": 4, "gpu": 1}
+        ),
+        tune_config=tune.TuneConfig(
+        metric="eval_f1",
+        mode="max",
+        search_alg=algo,
+        num_samples=3,
+    ),
+        param_space=config,
+    )
+
+    results = tuner.fit()
     # Get the best hyperparameters
-    best_trial = study.best_trial
-    best_hparams = best_trial.params
+
+    best_config = results.get_best_result().config
 
     # Save the best hyperparameters to a JSON file
-    outpath = os.path.join(config['model']['collateral_dir'],
+    outpath = os.path.join(user_cfg['model']['collateral_dir'],
                            "best_hparams.json")
     with open(outpath, "w") as f:
-        json.dump(best_hparams, f)
+        json.dump(best_config, f)
