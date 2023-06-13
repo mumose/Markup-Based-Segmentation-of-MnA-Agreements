@@ -10,3 +10,4 @@ tqdm==4.65.0
 transformers==4.29.2
 optuna==3.2.0
 torchmetrics==0.11.4
+ray==2.5.0
