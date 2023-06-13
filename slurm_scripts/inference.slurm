@@ -1,13 +1,13 @@
 #!/bin/bash
 
-#SBATCH --job-name=3pct_training_curves_run2
+#SBATCH --job-name=small_model_inf1
 #SBATCH --open-mode=append
-#SBATCH --output=/scratch/str8775/conda_env/maud/logs/training_curves/3pct/slurm/%x_%j.out
-#SBATCH --error=/scratch/str8775/conda_env/maud/logs/training_curves/3pct/slurm/%x_%j.err
+#SBATCH --output=/scratch/str8775/conda_env/maud/logs/model_small/slurm/%x_%j.out
+#SBATCH --error=/scratch/str8775/conda_env/maud/logs/model_small/slurm/%x_%j.err
 #SBATCH --export=ALL
 #SBATCH --time=7:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --mem=16G
+#SBATCH --mem=32G
 
 export ENV=$1
 
@@ -16,5 +16,5 @@ source /ext3/env.sh
 conda activate maud
 cd /scratch/str8775/conda_env/maud/Markup-Based-Segmentation-of-MnA-Agreements
 pip install -r requirements.txt --ignore-installed
-python3 train.py --config=./configs/config_training_curves3pct.yaml
+python3 inference.py --config=./configs/config.yaml
 "

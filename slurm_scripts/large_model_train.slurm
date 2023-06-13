@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH --job-name=large_model_run1
+#SBATCH --job-name=116-1-large_model_run1
 #SBATCH --open-mode=append
 #SBATCH --output=/scratch/str8775/conda_env/maud/logs/model_large/slurm/%x_%j.out
 #SBATCH --error=/scratch/str8775/conda_env/maud/logs/model_large/slurm/%x_%j.err
 #SBATCH --export=ALL
-#SBATCH --time=7:00:00
+#SBATCH --time=10:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --mem=48G
 

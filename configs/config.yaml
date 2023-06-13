@@ -61,7 +61,7 @@ model:
   train_batch_size: 8
   eval_batch_size: 8
 
-  num_epochs: 20
+  num_epochs: 10
   learning_rate: 5.0e-5
 
   # index to ignore in the loss_fn
@@ -70,7 +70,7 @@ model:
 
   collateral_dir: ../collateral/model_small/
   model_savepath: markuplm_small_model_run1.pt
-  early_stop_patience: 10
+  early_stop_patience: 3
 
 ablation:
   run_ablation: false

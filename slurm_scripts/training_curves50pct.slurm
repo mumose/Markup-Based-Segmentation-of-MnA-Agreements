@@ -1,13 +1,13 @@
 #!/bin/bash
 
-#SBATCH --job-name=50pct_training_curves_run1
+#SBATCH --job-name=3-50pct_training_curves-run2
 #SBATCH --open-mode=append
 #SBATCH --output=/scratch/str8775/conda_env/maud/logs/training_curves/50pct/slurm/%x_%j.out
 #SBATCH --error=/scratch/str8775/conda_env/maud/logs/training_curves/50pct/slurm/%x_%j.err
 #SBATCH --export=ALL
 #SBATCH --time=7:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --mem=16G
+#SBATCH --mem=32G
 
 export ENV=$1
 
@@ -15,6 +15,5 @@ singularity exec --nv --bind /scratch --overlay /scratch/str8775/conda_env/maud/
 source /ext3/env.sh
 conda activate maud
 cd /scratch/str8775/conda_env/maud/Markup-Based-Segmentation-of-MnA-Agreements
-pip install -r requirements.txt --ignore-installed
 python3 train.py --config=./configs/config_training_curves50pct.yaml
 "

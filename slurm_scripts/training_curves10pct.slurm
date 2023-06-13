@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=10pct_training_curves_run1
+#SBATCH --job-name=10pct_training_curves_run3
 #SBATCH --open-mode=append
 #SBATCH --output=/scratch/str8775/conda_env/maud/logs/training_curves/10pct/slurm/%x_%j.out
 #SBATCH --error=/scratch/str8775/conda_env/maud/logs/training_curves/10pct/slurm/%x_%j.err

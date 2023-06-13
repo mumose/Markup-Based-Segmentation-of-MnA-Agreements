@@ -1,11 +1,23 @@
 ---
+study_name: hparam_job
+hparams:
+  lr:
+    low: 5.00e-5
+    high: 5.00e-2
+
+  num_epochs:
+    low: 1
+    high: 5
+
+
+
 # dataset related params
 data:
   data_split: null
 
-  train_contract_dir: ../contracts/tagged/train/
-  eval_contract_dir: ../contracts/tagged/val/
-  test_contract_dir: ../contracts/tagged/test/
+  train_contract_dir: /scratch/str8775/conda_env/maud/contracts/tagged/train/
+  eval_contract_dir: /scratch/str8775/conda_env/maud/contracts/tagged/val/
+  test_contract_dir: /scratch/str8775/conda_env/maud/contracts/tagged/test/
 
   label_list:
     - o
@@ -58,8 +70,8 @@ model:
   use_large_model: false
   label_only_first_subword: true
 
-  train_batch_size: 8
-  eval_batch_size: 8
+  train_batch_size: 6
+  eval_batch_size: 4
 
   num_epochs: 20
   learning_rate: 5.0e-5

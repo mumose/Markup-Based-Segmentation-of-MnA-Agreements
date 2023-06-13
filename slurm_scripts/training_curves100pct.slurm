@@ -1,13 +1,13 @@
 #!/bin/bash
 
-#SBATCH --job-name=100pct_training_curves_run1
+#SBATCH --job-name=3-100pct_training_curves_run3
 #SBATCH --open-mode=append
 #SBATCH --output=/scratch/str8775/conda_env/maud/logs/training_curves/100pct/slurm/%x_%j.out
 #SBATCH --error=/scratch/str8775/conda_env/maud/logs/training_curves/100pct/slurm/%x_%j.err
 #SBATCH --export=ALL
 #SBATCH --time=7:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --mem=16G
+#SBATCH --mem=32G
 
 export ENV=$1
 

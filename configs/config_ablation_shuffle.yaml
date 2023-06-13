@@ -61,16 +61,16 @@ model:
   train_batch_size: 8
   eval_batch_size: 8
 
-  num_epochs: 20
-  learning_rate: 5.0e-5
+  num_epochs: 50
+  learning_rate: 2.0e-5
 
   # index to ignore in the loss_fn
   ignore_index: -100
   max_length: 512
 
   collateral_dir: ../collateral/ablation/shuffle/small
-  model_savepath: markuplm_model_ablation_shuffle_run2_65_contracts.pt
-  early_stop_patience: 4
+  model_savepath: markuplm_model_num_contract_116_ablation_shuffle_run1.pt
+  early_stop_patience: 10
 
 ablation:
   run_ablation: true
@@ -79,7 +79,7 @@ ablation:
   xpath_subs_pad_token: 1001
 
 predict:
-  model_path: null
+  model_path: ../collateral/ablation/shuffle/small/ckpt/markuplm_model_num_contract_116_ablation_shuffle_run1_epoch-9_f1-0.871.pt
 
 
 ...

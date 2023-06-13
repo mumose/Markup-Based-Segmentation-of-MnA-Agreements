@@ -61,15 +61,15 @@ model:
   train_batch_size: 8
   eval_batch_size: 8
 
-  num_epochs: 20
-  learning_rate: 5.0e-5
+  num_epochs: 50
+  learning_rate: 2.0e-5
 
   # index to ignore in the loss_fn
   ignore_index: -100
   max_length: 512
 
-  collateral_dir: ../collateral/training_curves/
-  model_savepath: markuplm_model_run1_num_contract-100pct.pt
+  collateral_dir: ../collateral/training_curves/num-contracts-100pct/
+  model_savepath: markuplm_model_run3_num_contract-100pct.pt
   early_stop_patience: 10
 
 ablation:
@@ -79,5 +79,6 @@ ablation:
   xpath_subs_pad_token: 1001
 
 predict:
-  model_path: null
+  model_path: ../collateral/training_curves/num-contracts-100pct/ckpt/markuplm_model_run3_num_contract-100pct_epoch-15_f1-0.903.pt
+
 ...

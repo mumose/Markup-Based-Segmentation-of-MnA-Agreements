@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=shuffle_ablation_run1
+#SBATCH --job-name=116-1-shuffle_ablation_run1
 #SBATCH --open-mode=append
 #SBATCH --output=/scratch/str8775/conda_env/maud/logs/ablation/shuffle/small/slurm/%x_%j.out
 #SBATCH --error=/scratch/str8775/conda_env/maud/logs/ablation/shuffle/small/slurm/%x_%j.err
