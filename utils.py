@@ -57,6 +57,10 @@ def get_dataset(contract_dir, id2label, label2id,
     contract_dir = os.path.join(contract_dir, "*.csv")
     contracts_list = glob.glob(contract_dir)
 
+    print("*" * 50)
+    print("length contract list", len(contracts_list))
+    print("*" * 50)
+
     # if data split is provided then shuffle and select the first data_split
     # entries
     if num_contracts:
@@ -69,11 +73,15 @@ def get_dataset(contract_dir, id2label, label2id,
 
     data = []
     for tagged_path in contracts_list:
-        tagged_output = input_pipeline.create_raw_dataset(
-            tagged_path, id2label=id2label, label2id=label2id
-        )
+        try:
+            tagged_output = input_pipeline.create_raw_dataset(
+                tagged_path, id2label=id2label, label2id=label2id
+            )
 
-        data.append(tagged_output)
+            data.append(tagged_output)
+        except Exception as e:
+            print(f"tagged_path={tagged_path}")
+            continue
 
     return data
 
