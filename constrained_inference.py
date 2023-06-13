@@ -306,7 +306,7 @@ def run_inference_loop(dataloader, model, device,
     display(test_metrics_df)
 
     collateral_dir = config['model']['collateral_dir']
-    test_metrics_savepath = f"{metric_basename}_test_metrics.csv"
+    test_metrics_savepath = f"{metric_basename}_mod_test_metrics.csv"
     test_metrics_df.to_csv(test_metrics_savepath, index=False)
 
     print("*" * 50)
