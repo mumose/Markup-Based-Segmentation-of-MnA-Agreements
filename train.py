@@ -30,7 +30,7 @@ set_seed(42)
 
 
 def run_train_loop(batch, model, optimizer, scheduler, loss_fct,
-                   device, train_metric, label_list, config):
+                   device, train_metric, label_list, config, idx):
     '''Runs train loop for one batch of input
 
     Args:
@@ -81,9 +81,12 @@ def run_train_loop(batch, model, optimizer, scheduler, loss_fct,
     )
     loss = loss_fct(active_logits, active_labels)
 
-    loss.backward()
-    optimizer.step()
-    scheduler.step()
+    # loss.backward()
+    loss.backward(retain_graph=True)
+
+    if (idx + 1) % 3 == 0:
+        optimizer.step()
+    # scheduler.step()
 
     print("Train Loss:", loss.item())
 
@@ -266,10 +269,11 @@ def main(config):
     train_metrics_list, eval_metrics_list = [], []
     for epoch in range(num_epochs):
         model.train()
-        for train_batch in tqdm(train_dataloader,
-                                desc='train_loop'):
+        for idx, train_batch in tqdm(enumerate(train_dataloader),
+                                     desc='train_loop',
+                                     total=len(train_dataloader)):
             run_train_loop(train_batch, model, optimizer, scheduler, loss_fct,
-                           device, train_metric, label_list, config)
+                           device, train_metric, label_list, config, idx)
 
         # run eval loop
         run_eval_loop(eval_dataloader, model, device,
@@ -288,11 +292,10 @@ def main(config):
         # save the state dict for the best run
         if eval_metrics["overall_f1"] > best_eval_score:
             model_savepath = config["model"]["model_savepath"].rsplit(".", 1)[0]
+
             model_savepath = (
                 f"{model_savepath}_epoch-{epoch}_f1-{eval_metrics['overall_f1']:0.3f}.pt"
             )
-            # update the config file model savepath entry
-            config['model']['model_savepath'] = model_savepath
 
             print(f"Eval score improved. {best_eval_score} -> {eval_metrics['overall_f1']}")
             print(f"Saving ckpt at {model_savepath}")
@@ -377,12 +380,13 @@ if __name__ == "__main__":
     metric_basename = os.path.join(config['model']['collateral_dir'],
                                    metric_basename)
 
-    train_metrics_savepath = os.path.join(collateral_dir,
-                                          f"{metric_basename}_train_metrics.csv")
+    print(f"metrcic_basename={metric_basename}")
+    train_metrics_savepath = f"{metric_basename}_train_metrics.csv"
+
+    print(f"{train_metrics_savepath}=train_metrics_savepath")
     train_metrics_df.to_csv(train_metrics_savepath, index=False)
     print(f"saved train metrics at {train_metrics_savepath}")
 
-    eval_metrics_savepath = os.path.join(collateral_dir,
-                                         f"{metric_basename}_eval_metrics.csv")
+    eval_metrics_savepath = f"{metric_basename}_eval_metrics.csv"
     eval_metrics_df.to_csv(eval_metrics_savepath, index=False)
     print(f"saved eval metrics at {eval_metrics_savepath}")

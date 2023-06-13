@@ -31,6 +31,63 @@ print(f"Using device {device}")
 set_seed(42)
 
 
+def get_valid_pred_ids(label2id, id2label, curr_pred_id, debug=False):
+    '''Creates a mask of valid label ids during inference
+
+    Args:
+        label2id: dict. Mapping between label names and label ids
+        id2label: dict. Mapping between label ids and label names
+        curr_pred_id: int. The pred_id of the pred at current timestep
+
+    Returns:
+        pred_mask: torch.Tensor. A mask of 0s and 1s repr valid ids
+    '''
+    # get the position of the current label, B, E, I or S
+    curr_pos_label, curr_cat = id2label[curr_pred_id].split("_")
+
+    if debug:
+        print(f"curr_pos_label = {curr_pos_label} curr_cat {curr_cat}")
+
+    if curr_pos_label in ['b', "i"]:
+        # if we see a B or I label, then the next label can
+        # only be an I or E of the same class
+        valid_pos_labels = ["i", "e"]
+        valid_label_ids = [label2id[f"{pos_label}_{curr_cat}"]
+                           for pos_label in valid_pos_labels]
+
+        # create a mask of 0s and then activate the valid label ids
+        pred_mask = np.zeros(len(label2id))
+        pred_mask[valid_label_ids] = 1
+
+        if debug:
+            print(f"valid_pos_labels, valid_label_ids {valid_pos_labels} {valid_label_ids}")
+
+    elif curr_pos_label in ["e", "s"]:
+        # if we see an E or S label, then the next label cannot
+        # be an I or E of any class
+        all_cats = list(label2id.keys())
+        all_cats = [x.split("_")[-1] for x in all_cats if x != 'o']
+        all_cats = list(set(all_cats))
+
+        # get the label ids of all the invalid ids
+        invalid_label_ids = []
+        invalid_pos_labels = ["i", "e"]
+        for pos_label in invalid_pos_labels:
+            for cat in all_cats:
+                label_name = f"{pos_label}_{cat}"
+                label_id = label2id[label_name]
+                invalid_label_ids.append(label_id)
+
+        # create a mask of ones and then kill the invalid label ids
+        pred_mask = np.ones(len(label2id))
+        pred_mask[invalid_label_ids] = 0
+
+        if debug:
+            print(f"all_cats, invalid_label_ids {all_cats} {invalid_label_ids}")
+
+    return pred_mask
+
+
 def compute_auprc(all_labels_bin,
                   all_preds,
                   metric_basename,
@@ -50,7 +107,6 @@ def compute_auprc(all_labels_bin,
     precision, recall, average_precision = dict(), dict(), dict()
     precision["macro"], recall["macro"], _ = precision_recall_curve(all_labels_bin.ravel(),
                                                                     all_preds.ravel())
-
     average_precision["macro"] = average_precision_score(all_labels_bin,
                                                          all_preds,
                                                          average="macro") # test out weighted
@@ -88,7 +144,9 @@ def compute_auprc(all_labels_bin,
 
 
 def get_batch_pred(batch, model, device,
-                   metric, label_list, config):
+                   metric, label_list,
+                   label2id, id2label, config,
+                   debug=False):
     '''Runs inference loop for one batch of input
 
     Args:
@@ -119,30 +177,63 @@ def get_batch_pred(batch, model, device,
     logits = outputs.logits
     labels = batch["labels"]
 
-    # get the str repr of the predictions and labels. Used for
-    # computing the f1-score
-    str_preds, str_refs = utils.convert_preds_to_labels(logits.argmax(dim=-1),
-                                                        labels,
-                                                        label_list,
-                                                        device)
-
-    metric.add_batch(predictions=str_preds, references=str_refs)
-
     # get the preds and labels corresponding to valid tokens
     # drop the special tokens
-    preds = logits.detach().cpu().squeeze(0).numpy()
-    refs = labels.detach().cpu().squeeze(0).numpy()
+    preds = logits.cpu().detach().squeeze(0).numpy()
+    refs = labels.cpu().detach().squeeze(0).numpy()
 
     valid_idx = np.where(refs != -100)[0]
 
     preds = preds[valid_idx]
     refs = refs[valid_idx]
 
+    seq_length, num_classes = preds.shape
+    pred_mask = np.ones(num_classes)
+    outside_label = label2id['o']
+    modified_preds = []
+    for ii in range(seq_length):
+
+        valid_preds = preds[ii] * pred_mask
+        curr_pred_id = valid_preds.argmax()
+        modified_preds.append(curr_pred_id)
+
+        if debug:
+            print("*" * 50)
+            print(f'ii= {ii} curr_pred = {curr_pred_id}')
+            print(f'ii= {ii} pred_mask = {pred_mask}')
+
+        # if the curr_pred is the outside label then
+        # continue to the next pred
+        if curr_pred_id == outside_label:
+
+            # get the mask for the next pred label
+            pred_mask = np.ones(num_classes)
+            continue
+
+        else:
+            # get the mask for the next pred label
+            pred_mask = get_valid_pred_ids(label2id, id2label,
+                                           curr_pred_id,
+                                           debug=False)
+
+        if debug:
+            print("*" * 50)
+
+    str_preds = [[id2label[pred_id] for pred_id in modified_preds]]
+    str_refs = [[id2label[label_id] for label_id in refs]]
+
+    if debug:
+        print(f"str_preds={str_preds} {len(str_preds[0])}")
+        print(f"str_refs={str_refs}, {len(str_refs[0])}")
+
+    metric.add_batch(predictions=str_preds, references=str_refs)
+
     return preds, refs
 
 
 def run_inference_loop(dataloader, model, device,
-                       metric, label_list, config,
+                       metric, label_list,
+                       label2id, id2label, config,
                        class_weights):
     '''Runs inference loop for entire dataset and saves metrics to disk
 
@@ -163,7 +254,9 @@ def run_inference_loop(dataloader, model, device,
     all_preds, all_labels = [], []
     for batch in tqdm(dataloader, desc='inference_loop'):
         preds, refs = get_batch_pred(batch, model, device,
-                                     metric, label_list, config)
+                                     metric, label_list,
+                                     label2id, id2label, config)
+
         all_preds.append(preds)
         all_labels.append(refs)
 
@@ -188,15 +281,17 @@ def run_inference_loop(dataloader, model, device,
     test_metrics['macro_auprc'] = macro_auprc
     test_metrics['weighted_auprc'] = weighted_auprc
 
-    all_cats = [x.split("-")[-1].upper() for x in label_list if x != 'O']
+    all_cats = [x.split("-")[-1].lower() for x in label_list if x != 'O']
     all_cats = list(set(all_cats))
+
+    print(test_metrics.keys())
 
     weighted_recall_sum, weighted_precision_sum, total_num = 0, 0, 0
     for cat in all_cats:
-        cat_num = test_metrics[f"{cat}_number"]
+        cat_num = test_metrics[f"_{cat}_number"]
 
-        weighted_recall_sum += test_metrics[f"{cat}_recall"] * cat_num
-        weighted_precision_sum += test_metrics[f"{cat}_precision"] * cat_num
+        weighted_recall_sum += test_metrics[f"_{cat}_recall"] * cat_num
+        weighted_precision_sum += test_metrics[f"_{cat}_precision"] * cat_num
         total_num += cat_num
 
 
@@ -313,8 +408,8 @@ def main(config):
                                 keep_in_memory=True)
 
     run_inference_loop(test_dataloader, model, device,
-                       test_metric, label_list, config,
-                       class_weights)
+                       test_metric, label_list,
+                       label2id, id2label, config, class_weights)
 
     return
 
