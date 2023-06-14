@@ -5,8 +5,7 @@ Sukrit Rao, Pranab Islam, Rohith Bollineni, Shaan Khosla, Tingyi Fei, Qian Wu, K
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8034852.svg)](https://doi.org/10.5281/zenodo.8034852)
 
-**This repo is no longer being maintained. For the code related to the paper 
-MarkupMnA: Markup-Based Segmentation of M&A Agreements please visit [[the new repo](https://github.com/MarkupMnA/MarkupMnA-Markup-Based-Segmentation-of-MnA-Agreements)] **
+**This repo has been moved to [[MarkupMnA/MarkupMnA-Markup-Based-Segmentation-of-MnA-Agreements](https://github.com/MarkupMnA/MarkupMnA-Markup-Based-Segmentation-of-MnA-Agreements)]**
 
 
 This repo contains:
